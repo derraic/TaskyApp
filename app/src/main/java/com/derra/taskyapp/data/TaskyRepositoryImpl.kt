@@ -337,12 +337,15 @@ class TaskyRepositoryImpl @Inject constructor(
             }
             remoteEvent?.let {
 
-                dao.insertEvent(remoteEvent.toEventEntity())
-                val newEvent = dao.getEventById(eventId = eventId)
-                emit(Resource.Success(newEvent!!.toEvent()))
+                if (localEvent == null || !localEvent.needsSync) {
+                    dao.insertEvent(remoteEvent.toEventEntity())
+                }
+
+
+
 
             }
-
+            emit(Resource.Success(dao.getEventById(eventId = eventId)?.toEvent()))
         }
     }
 
@@ -374,11 +377,15 @@ class TaskyRepositoryImpl @Inject constructor(
             }
             remoteTask?.let {
 
-                dao.insertTask(remoteTask.toTaskEntity())
-                val newTask = dao.getTaskById(taskId = taskId)
-                emit(Resource.Success(newTask!!.toTask()))
+                if (localTask == null || !localTask.needsSync){
+                    dao.insertTask(remoteTask.toTaskEntity())
+                }
+
+
+
 
             }
+            emit(Resource.Success(dao.getTaskById(taskId = taskId)?.toTask()))
         }
     }
 
@@ -414,12 +421,17 @@ class TaskyRepositoryImpl @Inject constructor(
             }
             remoteReminder?.let {
 
-                dao.insertReminder(remoteReminder.toReminderEntity())
-                val newTask = dao.getReminderById(reminderId = reminderId)
-                emit(Resource.Success(newTask!!.toReminder()))
+                if (localReminder == null || !localReminder.needsSync) {
+
+                    dao.insertReminder(remoteReminder.toReminderEntity())
+
+                }
+
+
+
 
             }
-
+            emit(Resource.Success(dao.getReminderById(reminderId = reminderId)?.toReminder()))
         }
     }
 

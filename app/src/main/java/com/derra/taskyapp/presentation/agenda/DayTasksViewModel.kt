@@ -234,6 +234,12 @@ class DayTasksViewModel @Inject constructor(
                     }
                 }
             }
+            is DayTaskEvent.DissmissDatePickerDialog -> {
+                agendaDialog = false
+            }
+            is DayTaskEvent.DifferentDaySelected -> {
+                daySelected = event.localDate
+            }
             is DayTaskEvent.AddItemDialogDismiss -> {
                 addItemDropDownDialog = false
             }

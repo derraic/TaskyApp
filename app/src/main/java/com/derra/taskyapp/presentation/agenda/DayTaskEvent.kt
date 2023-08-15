@@ -6,6 +6,10 @@ import java.time.LocalDate
 sealed class DayTaskEvent{
     object AddItemClick: DayTaskEvent()
     object AddEventClick: DayTaskEvent()
+
+    object DissmissDatePickerDialog: DayTaskEvent()
+
+    data class DifferentDaySelected(val localDate: LocalDate): DayTaskEvent()
     object AddTaskClick: DayTaskEvent()
     object AddReminderClick: DayTaskEvent()
     data class TaskItemCheckBoxClick(val checked: Boolean, val task: Task): DayTaskEvent()

@@ -9,6 +9,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.Text
+import androidx.compose.material3.*
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.DatePickerColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -27,9 +32,13 @@ import com.derra.taskyapp.R
 import com.derra.taskyapp.data.objectsviewmodel.Event
 import com.derra.taskyapp.data.objectsviewmodel.Reminder
 import com.derra.taskyapp.data.objectsviewmodel.Task
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterialScaffoldPaddingParameter")
 @Composable
 fun DayTasksScreen(
@@ -38,6 +47,14 @@ fun DayTasksScreen(
     onPopBackStack: () -> Unit,
 ){
     val scaffoldState = rememberScaffoldState()
+
+
+    val initialDateMillis = if (viewModel.daySelected != null) {
+        viewModel.daySelected!!.toEpochDay() * 24 * 60 * 60 * 1000 // Convert days to milliseconds
+    } else {
+        LocalDate.now().toEpochDay() * 24 * 60 * 60 * 1000
+    }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialDateMillis)
 
     LaunchedEffect(key1 = true) {
         viewModel.uiEvent.collect { event ->
@@ -54,6 +71,46 @@ fun DayTasksScreen(
 
                 }
             }
+        }
+    }
+
+    val currentDateAndTime = LocalDateTime.now()
+    val selectedDateAndTimeMillis: Long = datePickerState.selectedDateMillis!!
+
+    val selectedLocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(selectedDateAndTimeMillis), ZoneId.systemDefault())
+
+    val isDateAndTimeAfterNow = selectedLocalDateTime.isAfter(currentDateAndTime)
+    if (viewModel.agendaDialog) {
+        DatePickerDialog(onDismissRequest = {viewModel.onEvent(DayTaskEvent.DissmissDatePickerDialog) },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onEvent(DayTaskEvent.DissmissDatePickerDialog)
+                    },
+                    enabled = true
+                ) {
+                    androidx.compose.material3.Text(text = "cancel")
+                }
+
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val selectedDateMillis: Long = datePickerState.selectedDateMillis!! // The value from the DatePicker state
+
+                        val selectedLocalDate = LocalDate.ofEpochDay(selectedDateMillis / (24 * 60 * 60 * 1000))
+
+                        viewModel.onEvent(DayTaskEvent.DifferentDaySelected(selectedLocalDate))
+                    },
+                    enabled = isDateAndTimeAfterNow
+                ) {
+                    androidx.compose.material3.Text(text = "OK")
+                }
+        }) {
+            DatePicker(state = datePickerState
+                //, colors = DatePickerDefaults.colors()
+            )
+
         }
     }
 
@@ -93,7 +150,8 @@ fun DayTasksScreen(
                         )
                         )
                         Spacer(modifier = Modifier.width(5.dp))
-                        Image(painter = painterResource(id = R.drawable.drop_down_button), contentDescription = "choose different datum")
+                        Image(modifier = Modifier.clickable {viewModel.onEvent(DayTaskEvent.OpenAgendaDialogClick)
+                        },painter = painterResource(id = R.drawable.drop_down_button), contentDescription = "choose different datum")
 
 
                     }
