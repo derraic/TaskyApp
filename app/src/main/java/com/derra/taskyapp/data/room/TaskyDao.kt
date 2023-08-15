@@ -8,6 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.derra.taskyapp.data.objectsviewmodel.Reminder
 import com.derra.taskyapp.data.objectsviewmodel.Task
+import com.derra.taskyapp.data.room.entity.DeleteEntity
 import com.derra.taskyapp.data.room.entity.EventEntity
 import com.derra.taskyapp.data.room.entity.ReminderEntity
 import com.derra.taskyapp.data.room.entity.TaskEntity
@@ -58,5 +59,14 @@ interface TaskyDao {
 
     @Query("SELECT * FROM reminders WHERE needsSync = 1")
     suspend fun getSyncReminders(): List<ReminderEntity>
+
+    @Query("SELECT * FROM deletes")
+    suspend fun getDeletes(): List<DeleteEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun  insertDeletes(deleteEntity: DeleteEntity)
+
+    @Query("DELETE FROM deletes")
+    suspend fun deleteAllDeletes()
 
 }

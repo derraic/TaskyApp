@@ -7,6 +7,7 @@ import com.derra.taskyapp.data.objectsviewmodel.*
 import com.derra.taskyapp.data.remote.TaskyApi
 import com.derra.taskyapp.data.remote.dto.*
 import com.derra.taskyapp.data.room.TaskyDao
+import com.derra.taskyapp.data.room.entity.DeleteEntity
 import com.derra.taskyapp.data.room.entity.EventEntity
 import com.derra.taskyapp.data.room.entity.ReminderEntity
 import com.derra.taskyapp.data.room.entity.TaskEntity
@@ -122,40 +123,46 @@ class TaskyRepositoryImpl @Inject constructor(
             val eventsToSync = dao.getSyncEvents()
             val tasksToSync = dao.getSyncTasks()
             val remindersToSync = dao.getSyncReminders()
-            taskyApi.syncAgenda(
+
+            val deletedItems = dao.getDeletes()
+            val response = taskyApi.syncAgenda(
                 token = token,
-                deletedItems = SyncAgendaDto(eventsToSync.filter { it.kindOfSync == "DELETE" }.map { it.id },
-                    tasksToSync.filter { it.kindOfSync == "DELETE" }.map { it.id },
-                    remindersToSync.filter { it.kindOfSync == "DELETE" }.map { it.id })
+                deletedItems = SyncAgendaDto(deletedEventIds = deletedItems.filter { it.type == "EVENT" }.map { it.id },
+                    deletedReminderIds = deletedItems.filter { it.type == "REMINDER" }.map { it.id },
+                    deletedTaskIds = deletedItems.filter { it.type == "TASK" }.map { it.id })
             )
-            eventsToSync.filter { it.kindOfSync == "DELETE" }.forEach { event ->
-                dao.deleteEventById(event.id)
+            var counter = 0
+            if (response.isSuccessful) {
+                dao.deleteAllDeletes()
+                counter++
             }
 
-            tasksToSync.filter { it.kindOfSync == "DELETE" }.forEach { task ->
-                dao.deleteTaskById(task.id)
-            }
 
-            remindersToSync.filter { it.kindOfSync == "DELETE" }.forEach { reminder ->
-                dao.deleteReminderById(reminderId = reminder.id)
-            }
             eventsToSync.filter { it.kindOfSync == "UPDATE" }.forEach {event ->
                 val eventEnt = taskyApi.updateEvent(token = token, eventRequest = event.toEventUpdateDto(dao, userId), photos = emptyList())
                 if (eventEnt.isSuccessful) {
                     if (eventEnt.body() != null) {
                         dao.insertEvent(eventEnt.body()!!.toEventEntity())
+
                     }
 
                 }
             }
             tasksToSync.filter { it.kindOfSync == "UPDATE" }.forEach { task ->
-                taskyApi.updateTask(token = token, task = task.toTaskDto())
-                dao.insertTask(task.copy(needsSync = false))
+                val response = taskyApi.updateTask(token = token, task = task.toTaskDto())
+                if (response.isSuccessful) {
+                    dao.insertTask(task.copy(needsSync = false))
+
+                }
+
 
             }
             remindersToSync.filter {  it.kindOfSync == "UPDATE"  }.forEach {reminder ->
-                taskyApi.updateReminder(token = token, reminder = reminder.toReminderDto())
-                dao.insertReminder(reminder = reminder.copy(needsSync = false))
+                val response = taskyApi.updateReminder(token = token, reminder = reminder.toReminderDto())
+                if (response.isSuccessful) {
+                    dao.insertReminder(reminder = reminder.copy(needsSync = false))
+                }
+
 
             }
             eventsToSync.filter { it.kindOfSync == "POST" }.forEach {event ->
@@ -168,14 +175,23 @@ class TaskyRepositoryImpl @Inject constructor(
                 }
             }
             tasksToSync.filter { it.kindOfSync == "POST" }.forEach { task ->
-                taskyApi.createTask(token = token, task = task.toTaskDto())
-                dao.insertTask(task.copy(needsSync = false))
+                val response = taskyApi.createTask(token = token, task = task.toTaskDto())
+                if (response.isSuccessful) {
+                    dao.insertTask(task.copy(needsSync = false))
+                }
+
 
             }
             remindersToSync.filter {  it.kindOfSync == "POST"  }.forEach {reminder ->
-                taskyApi.createReminder(token = token, reminder = reminder.toReminderDto())
-                dao.insertReminder(reminder = reminder.copy(needsSync = false))
+                val response = taskyApi.createReminder(token = token, reminder = reminder.toReminderDto())
+                if (response.isSuccessful) {
+                    dao.insertReminder(reminder = reminder.copy(needsSync = false))
+                }
 
+
+            }
+            if (counter == 1 + remindersToSync.size + tasksToSync.size + eventsToSync.size) {
+                fullAgenda(token)
             }
 
 
@@ -237,17 +253,60 @@ class TaskyRepositoryImpl @Inject constructor(
 
     override suspend fun deleteEventItem(token: String, eventId: String) {
         dao.deleteEventById(eventId)
-        taskyApi.deleteEventItem(token = token, eventId = eventId )
+        try {
+            val response = taskyApi.deleteEventItem(token = token, eventId = eventId )
+            if (!response.isSuccessful) {
+                dao.insertDeletes(DeleteEntity("EVENT", eventId))
+
+            }
+        } catch (e: IOException) {
+            dao.insertDeletes(DeleteEntity("EVENT", eventId))
+
+        }
+        catch (e: HttpException) {
+            dao.insertDeletes(DeleteEntity("EVENT", eventId))
+
+        }
+
+
     }
 
     override suspend fun deleteTaskItem(token: String, taskId: String) {
         dao.deleteTaskById(taskId)
-        taskyApi.deleteTaskItem(token = token, taskId = taskId)
+        try {
+            val response = taskyApi.deleteTaskItem(token = token, taskId = taskId)
+            if (!response.isSuccessful) {
+                dao.insertDeletes(DeleteEntity("TASK", taskId))
+
+            }
+        }catch (e: IOException) {
+            dao.insertDeletes(DeleteEntity("TASK", taskId))
+
+        }
+        catch (e: HttpException) {
+            dao.insertDeletes(DeleteEntity("TASK", taskId))
+
+        }
+
     }
 
     override suspend fun deleteReminderItem(token: String, reminderId: String) {
         dao.deleteReminderById(reminderId = reminderId)
-        taskyApi.deleteReminderItem(token = token, reminderId = reminderId)
+        try {
+            val response = taskyApi.deleteReminderItem(token = token, reminderId = reminderId)
+            if (!response.isSuccessful) {
+                dao.insertDeletes(DeleteEntity("REMINDER", reminderId))
+            }
+        }catch (e: IOException) {
+            dao.insertDeletes(DeleteEntity("REMINDER", reminderId))
+
+        }
+        catch (e: HttpException) {
+            dao.insertDeletes(DeleteEntity("REMINDER", reminderId))
+
+        }
+
+
     }
 
     override suspend fun getEventItem(token: String, eventId: String): Flow<Resource<Event>> {
@@ -370,13 +429,22 @@ class TaskyRepositoryImpl @Inject constructor(
         photos: List<MultipartBody.Part>,
         host: String
     ){
-        val event = taskyApi.createEvent(token = token, eventRequest = eventRequest, photos = photos).body()?.toEventEntity()
-        if (event != null) {
-            dao.insertEvent(event)
+        try {
+            val event = taskyApi.createEvent(token = token, eventRequest = eventRequest, photos = photos).body()?.toEventEntity()
+            if (event != null) {
+                dao.insertEvent(event)
+            }
+            else {
+                dao.insertEvent(eventRequest.toEventEntity(host))
+            }
+        }catch (e: IOException) {
+            dao.insertEvent(eventRequest.toEventEntity(host))
+
         }
-        else {
+        catch (e: HttpException) {
             dao.insertEvent(eventRequest.toEventEntity(host))
         }
+
 
     }
 
@@ -386,13 +454,24 @@ class TaskyRepositoryImpl @Inject constructor(
         photos: List<MultipartBody.Part>,
         userId: String
     ){
-        val event = taskyApi.updateEvent(token = token, eventRequest = eventRequest, photos = photos).body()?.toEventEntity()
-        if (event != null) {
-            dao.insertEvent(event)
-        }
-        else {
+        try {
+            val event = taskyApi.updateEvent(token = token, eventRequest = eventRequest, photos = photos).body()?.toEventEntity()
+            if (event != null) {
+                dao.insertEvent(event)
+            }
+            else {
+                eventRequest.toEventEntity(dao, userId)?.let { dao.insertEvent(it) }
+            }
+        } catch (e: IOException) {
             eventRequest.toEventEntity(dao, userId)?.let { dao.insertEvent(it) }
+
+
         }
+        catch (e: HttpException) {
+            eventRequest.toEventEntity(dao, userId)?.let { dao.insertEvent(it) }
+
+        }
+
     }
 
 
@@ -407,59 +486,59 @@ class TaskyRepositoryImpl @Inject constructor(
         taskyApi.deleteAttendee(token = token, eventId =  eventId)
     }
 
-    override suspend fun createReminder(token: String, reminder: ReminderDto) {
+    override suspend fun createReminder(token: String, reminder: ReminderEntity) {
         try {
-            taskyApi.createReminder(token = token, reminder = reminder)
-            dao.insertReminder(reminder.toReminderEntity())
+            taskyApi.createReminder(token = token, reminder = reminder.toReminderDto())
+            dao.insertReminder(reminder)
         }
         catch (e: HttpException) {
-            dao.insertReminder(reminder.toReminderEntity().copy(needsSync = true, kindOfSync = "POST"))
+            dao.insertReminder(reminder.copy(needsSync = true, kindOfSync = "POST"))
         }
         catch (e: IOException) {
-            dao.insertReminder(reminder.toReminderEntity().copy(needsSync = true, kindOfSync = "POST"))
+            dao.insertReminder(reminder.copy(needsSync = true, kindOfSync = "POST"))
         }
 
     }
 
-    override suspend fun createTask(token: String, task: TaskDto) {
+    override suspend fun createTask(token: String, task: TaskEntity) {
         try {
-            taskyApi.createTask(token = token,task = task)
-            dao.insertTask(task.toTaskEntity())
+            taskyApi.createTask(token = token,task = task.toTaskDto())
+            dao.insertTask(task)
 
         }
         catch (e: HttpException) {
-            dao.insertTask(task.toTaskEntity().copy(needsSync = true, kindOfSync = "POST"))
+            dao.insertTask(task.copy(needsSync = true, kindOfSync = "POST"))
         }
         catch (e: IOException) {
-            dao.insertTask(task.toTaskEntity().copy(needsSync = true, kindOfSync = "POST"))
+            dao.insertTask(task.copy(needsSync = true, kindOfSync = "POST"))
         }
     }
 
-    override suspend fun updateTask(token: String, task: TaskDto) {
+    override suspend fun updateTask(token: String, task: TaskEntity) {
         try {
-            taskyApi.updateTask(token = token,task = task)
-            dao.insertTask(task.toTaskEntity())
+            taskyApi.updateTask(token = token,task = task.toTaskDto())
+            dao.insertTask(task)
 
         }
         catch (e: HttpException) {
-            dao.insertTask(task.toTaskEntity().copy(needsSync = true, kindOfSync = "UPDATE"))
+            dao.insertTask(task.copy(needsSync = true, kindOfSync = "UPDATE"))
         }
         catch (e: IOException) {
-            dao.insertTask(task.toTaskEntity().copy(needsSync = true, kindOfSync = "UPDATE"))
+            dao.insertTask(task.copy(needsSync = true, kindOfSync = "UPDATE"))
         }
     }
 
 
-    override suspend fun updateReminder(token: String, reminder: ReminderDto) {
+    override suspend fun updateReminder(token: String, reminder: ReminderEntity) {
         try {
-            taskyApi.updateReminder(token = token, reminder = reminder)
-            dao.insertReminder(reminder.toReminderEntity())
+            taskyApi.updateReminder(token = token, reminder = reminder.toReminderDto())
+            dao.insertReminder(reminder)
         }
         catch (e: HttpException) {
-            dao.insertReminder(reminder.toReminderEntity().copy(needsSync = true, kindOfSync = "UPDATE"))
+            dao.insertReminder(reminder.copy(needsSync = true, kindOfSync = "UPDATE"))
         }
         catch (e: IOException) {
-            dao.insertReminder(reminder.toReminderEntity().copy(needsSync = true, kindOfSync = "UPDATE"))
+            dao.insertReminder(reminder.copy(needsSync = true, kindOfSync = "UPDATE"))
         }
 
     }

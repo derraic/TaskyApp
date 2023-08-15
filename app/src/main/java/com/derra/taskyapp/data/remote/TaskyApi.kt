@@ -46,7 +46,7 @@ interface TaskyApi {
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Body deletedItems: SyncAgendaDto
-    ): ResponseBody
+    ): Response<ResponseBody>
 
     @GET
     suspend fun fullAgenda(
@@ -59,21 +59,21 @@ interface TaskyApi {
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("eventId") eventId: String
-    ): ResponseBody
+    ): Response<ResponseBody>
 
     @DELETE
     suspend fun deleteTaskItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("taskId") taskId: String
-    ): ResponseBody
+    ): Response<ResponseBody>
 
     @DELETE
     suspend fun deleteReminderItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("reminderId") reminderId: String
-    ): ResponseBody
+    ): Response<ResponseBody>
 
     @GET
     suspend fun getTaskItem(
@@ -133,28 +133,28 @@ interface TaskyApi {
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Body task: TaskDto
-    )
+    ) : Response<ResponseBody>
 
     @PUT("/task")
     suspend fun updateTask(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Body task: TaskDto
-    )
+    ) : Response<ResponseBody>
 
     @POST("/reminder")
     suspend fun createReminder(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Body reminder: ReminderDto
-    )
+    ) : Response<ResponseBody>
 
     @PUT("/reminder")
     suspend fun updateReminder(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Body reminder: ReminderDto
-    )
+    ) : Response<ResponseBody>
 
     companion object {
         const val BASE_URL = "https://tasky.pl-coding.com/"

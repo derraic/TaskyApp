@@ -3,14 +3,19 @@ package com.derra.taskyapp.presentation.agenda
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -18,13 +23,17 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.derra.taskyapp.R
 import com.derra.taskyapp.data.objectsviewmodel.Event
 
 @Composable
-fun EventItem(event: Event, startDateTime: String, endDateTime: String) {
+fun EventItem(event: Event, startDateTime: String, endDateTime: String, viewModel: DayTasksViewModel) {
+
+
+
     Box(modifier = Modifier
         .shadow(elevation = 4.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
         .fillMaxWidth()
@@ -64,8 +73,24 @@ fun EventItem(event: Event, startDateTime: String, endDateTime: String) {
 
             }
         }
-        Box( modifier = Modifier.padding(top = 15.dp, end = 14.dp), contentAlignment = Alignment.TopEnd, ) {
+        Box( modifier = Modifier
+            .padding(top = 15.dp, end = 14.dp)
+            .pointerInput(true) {
+                detectTapGestures(onTap = {
+                    viewModel.onEvent(DayTaskEvent.IconEditItemClick(event))
+
+                }
+                )
+
+
+            }, contentAlignment = Alignment.TopEnd, ) {
             Image(painter =  painterResource(id = R.drawable.edit_item_notselected) , contentDescription = "edit item")
+        }
+        DropdownMenu(expanded = viewModel.editDropDownDialog , onDismissRequest = { viewModel.onEvent(DayTaskEvent.EditItemsDialogDismiss)}) {
+            DropdownMenuItem(onClick = { viewModel.onEvent(DayTaskEvent.EditItemsDialogDismiss) }) {
+                EditDesignOfDialog(viewModel)
+            }
+
         }
         Box(modifier = Modifier.padding(end = 15.dp, bottom = 12.dp), contentAlignment = Alignment.BottomEnd){
             Text(text =  "$startDateTime - $endDateTime", style = TextStyle(

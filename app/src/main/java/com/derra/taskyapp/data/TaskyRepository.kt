@@ -2,6 +2,8 @@ package com.derra.taskyapp.data
 
 import com.derra.taskyapp.data.objectsviewmodel.*
 import com.derra.taskyapp.data.remote.dto.*
+import com.derra.taskyapp.data.room.entity.ReminderEntity
+import com.derra.taskyapp.data.room.entity.TaskEntity
 import com.derra.taskyapp.util.Resource
 import kotlinx.coroutines.flow.Flow
 import okhttp3.MultipartBody
@@ -74,22 +76,22 @@ interface TaskyRepository {
 
     suspend fun createTask(
         token: String,
-        task: TaskDto
+        task: TaskEntity
     )
 
     suspend fun updateTask(
         token: String,
-        task: TaskDto
+        task: TaskEntity
     )
 
     suspend fun createReminder(
         token: String,
-        reminder: ReminderDto
+        reminder: ReminderEntity
     )
 
     suspend fun updateReminder(
         token: String,
-        reminder: ReminderDto
+        reminder: ReminderEntity
     )
 
 

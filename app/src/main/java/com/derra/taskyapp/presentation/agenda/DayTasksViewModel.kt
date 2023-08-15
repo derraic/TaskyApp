@@ -3,19 +3,22 @@ package com.derra.taskyapp.presentation.agenda
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.TextStyle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.derra.taskyapp.data.TaskyRepository
-import com.derra.taskyapp.data.mappers_dto_to_entity.getDeviceTimeZone
+import com.derra.taskyapp.data.mappers.toTaskEntity
 import com.derra.taskyapp.data.objectsviewmodel.Event
 import com.derra.taskyapp.data.objectsviewmodel.Reminder
 import com.derra.taskyapp.data.objectsviewmodel.Task
 import com.derra.taskyapp.data.remote.dto.LoginResponseDto
 import com.derra.taskyapp.util.Resource
+import com.derra.taskyapp.util.Routes
+import com.derra.taskyapp.util.UiEvent
 import com.derra.taskyapp.util.UserManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -41,11 +44,16 @@ class DayTasksViewModel @Inject constructor(
     var reminders by mutableStateOf<List<Reminder>>(emptyList())
     var sortedList by mutableStateOf<List<Any>>(emptyList())
     var deleteDialog by mutableStateOf(false)
-    var loginDropDowDialog by mutableStateOf(false)
-    var editDropDownDialogEvent by mutableStateOf(false)
-    var editDropDownDialogTask by mutableStateOf(false)
-    var editDropDownDialogReminder by mutableStateOf(false)
+    var logoutDropDownDialog by mutableStateOf(false)
+    var editDropDownDialog by mutableStateOf(false)
     var addItemDropDownDialog by mutableStateOf(false)
+    var agendaDialog by mutableStateOf(false)
+
+    var currItemSelected: Any? = null
+
+    private val _uiEvent = Channel<UiEvent>()
+
+    val uiEvent = _uiEvent.receiveAsFlow()
 
 
     
@@ -100,17 +108,44 @@ class DayTasksViewModel @Inject constructor(
     fun onEvent(event: DayTaskEvent){
         when (event) {
             is DayTaskEvent.AddEventClick -> {
+                addItemDropDownDialog = false
 
+                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_EVENT_SCREEN))
+                // navigate to event in edit mode
 
             }
             is DayTaskEvent.AddReminderClick -> {
-
+                addItemDropDownDialog = false
+                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_REMINDER_SCREEN))
+                // navigate to reminder in edit mode
             }
             is DayTaskEvent.AddTaskClick -> {
-
+                addItemDropDownDialog = false
+                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_TASK_SCREEN))
+                // navigate to task in edit mode
             }
             is DayTaskEvent.ConfirmDialogOkClick -> {
+                when (currItemSelected) {
+                    is Event -> {
+                        viewModelScope.launch {
+                            repository.deleteEventItem(token, (currItemSelected as Event).id)
+                        }
 
+                    }
+                    is Reminder -> {
+                        viewModelScope.launch {
+                            repository.deleteReminderItem(token, (currItemSelected as Reminder).id)
+                        }
+
+                    }
+                    is Task -> {
+                        viewModelScope.launch {
+                            repository.deleteTaskItem(token, (currItemSelected as Task).id)
+                        }
+
+                    }
+                    // ask chatgpt if it works when an item gets deleted
+                }
                 
             }
             is DayTaskEvent.AnotherDayClick -> {
@@ -122,27 +157,93 @@ class DayTasksViewModel @Inject constructor(
 
             }
             is DayTaskEvent.DeleteItemClick -> {
+                deleteDialog = true
+
+
 
             }
-            is DayTaskEvent.EditItemClick -> {
+            is DayTaskEvent.IconEditItemClick -> {
+                editDropDownDialog = true
+                currItemSelected = event.item
+
 
             }
             is DayTaskEvent.ConfirmDialogCancelClick -> {
+                currItemSelected = null
+                deleteDialog = false
 
             }
             is DayTaskEvent.LogoutClick -> {
+                viewModelScope.launch {
+                    repository.logout(token = token)
+                }
+                logoutDropDownDialog = false
+                sendUiEvent(UiEvent.PopBackStack)
 
             }
             is DayTaskEvent.OpenAgendaDialogClick -> {
+                agendaDialog = true
+
 
             }
             is DayTaskEvent.TaskItemCheckBoxClick -> {
+                viewModelScope.launch {
+                    repository.updateTask(token, task = event.task.toTaskEntity().copy(isDone = event.checked))
+                }
+               getDayThings(daySelected!!.toEpochDay())
 
             }
             is DayTaskEvent.UserProfileClick -> {
+                logoutDropDownDialog = true
 
             }
+            is DayTaskEvent.EditItemClick -> {
+                when (currItemSelected) {
+                    is Event -> {
+                        sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_EVENT_SCREEN +
+                                "?eventId=${(currItemSelected as Event).id}" + "?isEditable={true}")  )
+
+                    }
+                    is Task -> {
+                        sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_TASK_SCREEN +
+                                "?taskId=${(currItemSelected as Task).id}" + "?isEditable={true}")  )
+
+                    }
+                    is Reminder -> {
+                        sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_REMINDER_SCREEN +
+                                "?taskId=${(currItemSelected as Reminder).id}" + "?isEditable={true}")  )
+                    }
+                }
+            }
             is DayTaskEvent.OpenItemClick -> {
+                when (currItemSelected) {
+                    is Event -> {
+                        sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_EVENT_SCREEN +
+                                "?eventId=${(currItemSelected as Event).id}" + "?isEditable={false}")  )
+
+                    }
+                    is Task -> {
+                        sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_TASK_SCREEN +
+                                "?taskId=${(currItemSelected as Task).id}" + "?isEditable={false}")  )
+
+                    }
+                    is Reminder -> {
+                        sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_REMINDER_SCREEN +
+                                "?taskId=${(currItemSelected as Reminder).id}" + "?isEditable={false}")  )
+                        // ask chatgpt about the smart cast
+                    }
+                }
+            }
+            is DayTaskEvent.AddItemDialogDismiss -> {
+                addItemDropDownDialog = false
+            }
+            is DayTaskEvent.EditItemsDialogDismiss -> {
+                currItemSelected = null
+                editDropDownDialog = false
+
+            }
+            is DayTaskEvent.LogOutDialogDismiss -> {
+                logoutDropDownDialog = false
 
             }
 
@@ -216,6 +317,12 @@ class DayTasksViewModel @Inject constructor(
         }
 
 
+    }
+
+    private fun sendUiEvent(event: UiEvent) {
+        viewModelScope.launch {
+            _uiEvent.send(event)
+        }
     }
 
 

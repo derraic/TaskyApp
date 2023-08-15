@@ -1,7 +1,6 @@
 package com.derra.taskyapp.presentation.agenda
 
 import android.annotation.SuppressLint
-import android.widget.Space
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,21 +8,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Scaffold
-import androidx.compose.material.Text
-import androidx.compose.material.rememberScaffoldState
+import androidx.compose.material.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role.Companion.Image
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -39,15 +34,40 @@ import java.util.*
 @Composable
 fun DayTasksScreen(
     onNavigate: (UiEvent.Navigate) -> Unit,
-    viewModel: DayTasksViewModel = hiltViewModel()
+    viewModel: DayTasksViewModel = hiltViewModel(),
+    onPopBackStack: () -> Unit,
 ){
-
     val scaffoldState = rememberScaffoldState()
 
+    LaunchedEffect(key1 = true) {
+        viewModel.uiEvent.collect { event ->
+            when (event) {
+                is UiEvent.PopBackStack -> onPopBackStack()
+                is UiEvent.ShowSnackBar -> {
+                    scaffoldState.snackbarHostState.showSnackbar(
+                        message = event.message,
+                        actionLabel = event.action
+                    )
+                }
+                is UiEvent.Navigate -> {
+                    onNavigate(event)
+
+                }
+            }
+        }
+    }
+
+
     Scaffold(scaffoldState = scaffoldState, modifier = Modifier.fillMaxSize(), floatingActionButton = {
-        Box(modifier = Modifier.clickable {  }){
+        Box(modifier = Modifier.clickable {viewModel.onEvent(DayTaskEvent.UserProfileClick)  }){
             Image(painter = painterResource(id = R.drawable.black_box_add_item), contentDescription = "black box")
             Image(painter = painterResource(id = R.drawable.plus_add_item), contentDescription = "plus icon")
+        }
+        DropdownMenu(expanded = viewModel.addItemDropDownDialog , onDismissRequest = { viewModel.onEvent(DayTaskEvent.AddItemClick)}) {
+            DropdownMenuItem(onClick = {}) {
+                AddAgendaDropDown(viewModel)
+            }
+
         }
     }) {
         Column(
@@ -77,7 +97,8 @@ fun DayTasksScreen(
 
 
                     }
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(contentAlignment = Alignment.Center,
+                        modifier = Modifier.clickable {viewModel.onEvent(DayTaskEvent.UserProfileClick)  }) {
                         Image(painter = painterResource(id = R.drawable.profile_rounded_icon), contentDescription = "profile icon")
                         Text(text = viewModel.name.uppercase(Locale.ROOT),
                             style = TextStyle(
@@ -87,6 +108,12 @@ fun DayTasksScreen(
                                 fontWeight = FontWeight(600),
                                 color = Color(0xFFB7C6DE),
                             ))
+
+                    }
+                    DropdownMenu(expanded = viewModel.logoutDropDownDialog , onDismissRequest = { viewModel.onEvent(DayTaskEvent.LogOutDialogDismiss)}) {
+                        DropdownMenuItem(onClick = { viewModel.onEvent(DayTaskEvent.LogoutClick) }) {
+                            LogoutDialog()
+                        }
 
                     }
 
@@ -146,7 +173,7 @@ fun DayTasksScreen(
                         else {
                             addSpace = true
                         }
-                        ReminderItem(reminder = item, dateTime = viewModel.formatLocalDateTime(item.time))
+                        ReminderItem(reminder = item, dateTime = viewModel.formatLocalDateTime(item.time), viewModel)
                         if (addSpace) {
                             Spacer(modifier = Modifier.height(15.dp))
                         }
@@ -163,13 +190,24 @@ fun DayTasksScreen(
                         else {
                             addSpace = true
                         }
-                        EventItem(event = item, startDateTime = viewModel.formatLocalDateTime(item.from), endDateTime =  viewModel.formatLocalDateTime(item.to))
+                        EventItem(event = item, startDateTime = viewModel.formatLocalDateTime(item.from), endDateTime =  viewModel.formatLocalDateTime(item.to), viewModel)
                         if (addSpace) {
                             Spacer(modifier = Modifier.height(15.dp))
                         }
                     }
                     is Task -> {
-                        TaskItem(task = item, dateTime = viewModel.formatLocalDateTime(item.time))
+                        if (item.time > LocalDateTime.now() && addLine)  {
+                            addLine = false
+                            addSpace = false
+                            Spacer(modifier = Modifier.height(6.dp))
+                            TimeArrowIndicator()
+                            Spacer(modifier = Modifier.height(7.dp))
+
+                        }
+                        else {
+                            addSpace = true
+                        }
+                        TaskItem(task = item, dateTime = viewModel.formatLocalDateTime(item.time), viewModel)
                         if (addSpace) {
                             Spacer(modifier = Modifier.height(15.dp))
                         }
