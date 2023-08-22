@@ -144,8 +144,10 @@ class DayTasksViewModel @Inject constructor(
                         }
 
                     }
+
                     // ask chatgpt if it works when an item gets deleted
                 }
+                getDayThings(daySelected!!.toEpochDay())
                 
             }
             is DayTaskEvent.AnotherDayClick -> {

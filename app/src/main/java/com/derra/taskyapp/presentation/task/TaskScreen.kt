@@ -14,9 +14,11 @@ fun TaskScreen(
     val editMode = viewModel.editMode
 
     if (editMode) {
+        TaskEditableScreen(viewModel)
 
     }
     else {
+        TaskNonEditableScreen(viewModel)
 
     }
 

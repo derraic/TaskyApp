@@ -15,6 +15,7 @@ import com.derra.taskyapp.util.UserManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.LocalDateTime
 import javax.inject.Inject
 
@@ -90,6 +91,23 @@ class TaskViewModel @Inject constructor(
         }
 
 
+    }
+
+    fun calculateReminderTime(dateTime: LocalDateTime, remindAt: LocalDateTime): String {
+        val duration = Duration.between(dateTime, remindAt)
+
+        val minutes = duration.toMinutes()
+        val hours = duration.toHours()
+        val days = duration.toDays()
+
+        return when {
+            minutes < 10 -> "$minutes minutes before"
+            minutes < 30 -> "$minutes minutes before"
+            hours < 1 -> "$minutes minutes before"
+            hours < 6 -> "$hours hours before"
+            days < 1 -> "$hours hours before"
+            else -> "$days days before"
+        }
     }
 
     private fun getLoginResponse(): LoginResponseDto? {
