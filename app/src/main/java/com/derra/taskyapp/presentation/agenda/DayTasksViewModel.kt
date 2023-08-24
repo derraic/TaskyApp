@@ -127,9 +127,17 @@ class DayTasksViewModel @Inject constructor(
             is DayTaskEvent.ConfirmDialogOkClick -> {
                 when (currItemSelected) {
                     is Event -> {
-                        viewModelScope.launch {
-                            repository.deleteEventItem(token, (currItemSelected as Event).id)
+                        if ((currItemSelected as Event).isUserEventCreator) {
+                            viewModelScope.launch {
+                                repository.deleteEventItem(token, (currItemSelected as Event).id)
+                            }
                         }
+                        else {
+                            viewModelScope.launch {
+                                repository.deleteAttendee(token, (currItemSelected as Event).id)
+                            }
+                        }
+
 
                     }
                     is Reminder -> {
