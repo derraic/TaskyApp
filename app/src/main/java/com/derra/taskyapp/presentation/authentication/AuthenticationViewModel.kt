@@ -81,7 +81,7 @@ class AuthenticationViewModel @Inject constructor(private val repository: TaskyR
             is AuthenticationEvent.OnLoginButtonClick -> {
                 if (emailAddressCheck && passwordCheck) {
                     val loginUser = LoginDto(emailAddress, password)
-                    Log.d("Login", "This is emai; $emailAddress nd this is password: $password")
+                    Log.d("Login", "This is email $emailAddress nd this is password: $password")
                     viewModelScope.launch(Dispatchers.IO) {
                         try {
                             val response = repository.loginUser(loginUser).execute()

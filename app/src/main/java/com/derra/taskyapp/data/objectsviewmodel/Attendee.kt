@@ -8,5 +8,6 @@ data class Attendee(
     val userId: String,
     val eventId: String,
     var isGoing: Boolean,
-    val RemindAt: LocalDateTime
+    val remindAt: LocalDateTime,
+
 )

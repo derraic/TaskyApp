@@ -3,6 +3,9 @@ package com.derra.taskyapp.di
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
+import com.derra.taskyapp.ReminderNotificationService
+import com.derra.taskyapp.SyncWorker
+import com.derra.taskyapp.data.NotificationAlarmScheduler
 import com.derra.taskyapp.data.TaskyRepository
 import com.derra.taskyapp.data.TaskyRepositoryImpl
 import com.derra.taskyapp.data.remote.TaskyApi
@@ -46,15 +49,31 @@ object AppModule {
         return Room.databaseBuilder(
             app,
             TaskyDatabase::class.java, "tasky.db",
-        ).build()
+        ).fallbackToDestructiveMigration().build()
+    }
+
+    @Provides
+    fun provideContext(@ApplicationContext appContext: Context): Context {
+        return appContext
     }
 
 
     @Provides
     @Singleton
-    fun provideTaskyRepository(taskyApi: TaskyApi, db: TaskyDatabase): TaskyRepository {
-        return TaskyRepositoryImpl(taskyApi, db.dao)
+    fun provideTaskyRepository(taskyApi: TaskyApi, db: TaskyDatabase, @ApplicationContext context: Context): TaskyRepository {
+        return TaskyRepositoryImpl(taskyApi, db.dao, context)
     }
+
+
+    @Provides
+    @Singleton
+    fun provideNotificationAlarmScheduler(@ApplicationContext context: Context): NotificationAlarmScheduler {
+        return NotificationAlarmScheduler(context)
+    }
+
+
+
+
 
 
 }

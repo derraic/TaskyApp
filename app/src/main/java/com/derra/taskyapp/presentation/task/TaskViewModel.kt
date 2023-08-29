@@ -1,17 +1,22 @@
 package com.derra.taskyapp.presentation.task
 
 
+import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.derra.taskyapp.data.NotificationAlarmScheduler
 import com.derra.taskyapp.data.TaskyRepository
 import com.derra.taskyapp.data.mappers.toReminderEntity
+import com.derra.taskyapp.data.mappers.toTaskEntity
 import com.derra.taskyapp.data.objectsviewmodel.Reminder
 import com.derra.taskyapp.data.objectsviewmodel.Task
 import com.derra.taskyapp.data.remote.dto.LoginResponseDto
+import com.derra.taskyapp.data.room.entity.NotificationEntity
 import com.derra.taskyapp.util.Resource
 import com.derra.taskyapp.util.UiEvent
 import com.derra.taskyapp.util.UserManager
@@ -31,6 +36,7 @@ import javax.inject.Inject
 class TaskViewModel @Inject constructor(
     private val repository: TaskyRepository,
     private val userManager: UserManager,
+    private val context: Context,
     savedStateHandle: SavedStateHandle
 ): ViewModel() {
 
@@ -83,11 +89,12 @@ class TaskViewModel @Inject constructor(
         val taskId = savedStateHandle.get<String>("taskId")!!
         val isEditable = savedStateHandle.get<Boolean>("isEditable")!!
         token = getLoginResponse()!!.token
+        token = "Bearer $token"
 
 
-        if (isEditable) {
-            editMode = true
-        }
+        Log.d("TEST", "This is isEditable: $isEditable")
+
+        editMode = isEditable
 
         if (taskId != "NONE") {
             newTask = false
@@ -96,7 +103,7 @@ class TaskViewModel @Inject constructor(
                     when (resource) {
                         is Resource.Success -> {
                             task = resource.data
-                            title = task?.id ?: ""
+                            title = task?.title ?: ""
                             description = task?.description ?: ""
                             dateTime = task?.time!!
                             time = dateTime.toLocalTime()
@@ -132,6 +139,7 @@ class TaskViewModel @Inject constructor(
 
 
     }
+    private val scheduler = NotificationAlarmScheduler(context)
 
     fun onEvent(event: TaskEvent) {
         when (event) {
@@ -171,7 +179,7 @@ class TaskViewModel @Inject constructor(
                 tempString = description
             }
             is TaskEvent.EditTimeClick -> {
-                editTitleMode = true
+                timeDialog = true
 
             }
 
@@ -191,21 +199,35 @@ class TaskViewModel @Inject constructor(
             is TaskEvent.SaveNewDescriptionClick -> {
                 description = tempString
                 tempString = ""
+                editDescriptionMode= false
             }
             is TaskEvent.SaveNewTitleClick -> {
                 title = tempString
                 tempString = ""
+                editTitleMode = false
 
             }
             is TaskEvent.SaveButtonClick -> {
+
                 if (newTask) {
                     viewModelScope.launch {
-                        repository.createReminder(token, Reminder(id = UUID.randomUUID().toString(), title = title, description = description, time = dateTime, remindAt = remindAt).toReminderEntity())
+                        val id = UUID.randomUUID().toString()
+                        repository.createTask(token, Task(id = id,
+                            title = title, description = description, time = dateTime, remindAt = remindAt,
+                            isDone=  checked).toTaskEntity())
+                        val notification = NotificationEntity(id = id, name = title, description = description, itemType = 2, remindAt)
+                        notification.let(scheduler::schedule)
+                        repository.insertNotification(notification)
                     }
                 }
                 else {
                     viewModelScope.launch {
-                        repository.updateReminder(token,  Reminder(id = UUID.randomUUID().toString(), title = title, description = description, time = dateTime, remindAt = remindAt).toReminderEntity())
+                        repository.updateTask(token,  Task(id = task!!.id, title = title,
+                            description = description, time = dateTime, remindAt = remindAt, isDone = checked).toTaskEntity())
+                        val notification = NotificationEntity(id = task!!.id, name = title, description = description,
+                            itemType = 2, remindAt)
+                        notification.let(scheduler::schedule)
+                        repository.insertNotification(notification)
                     }
                 }
 
@@ -245,9 +267,13 @@ class TaskViewModel @Inject constructor(
                 deleteDialog = false
                 if (task != null) {
                     viewModelScope.launch {
-                        repository.deleteReminderItem(token, reminderId = task!!.id)
+                        repository.deleteTaskItem(token, taskId = task!!.id)
+                        val notification = repository.getNotificationById(task!!.id)
+                        notification?.let(scheduler::cancel)
                     }
+                    sendUiEvent(UiEvent.PopBackStack)
                 }
+
                 else {
                     sendUiEvent(UiEvent.PopBackStack)
                 }

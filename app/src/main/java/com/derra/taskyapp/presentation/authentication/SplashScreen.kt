@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.derra.taskyapp.R
 import com.derra.taskyapp.util.UiEvent
@@ -23,8 +24,10 @@ import com.derra.taskyapp.util.UiEvent
 @Composable
 fun SplashScreen(
     onNavigate: (UiEvent.Navigate) -> Unit,
-    viewModel: AuthenticationViewModel = hiltViewModel()
+    viewModel: AuthenticationViewModel = hiltViewModel(),
+    window: android.view.Window
 ) {
+    WindowCompat.setDecorFitsSystemWindows(window, false)
 
     LaunchedEffect(true) {
         viewModel.onEvent(AuthenticationEvent.OnSplashScreenWait)

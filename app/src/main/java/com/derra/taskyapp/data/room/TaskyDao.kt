@@ -8,23 +8,21 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.derra.taskyapp.data.objectsviewmodel.Reminder
 import com.derra.taskyapp.data.objectsviewmodel.Task
-import com.derra.taskyapp.data.room.entity.DeleteEntity
-import com.derra.taskyapp.data.room.entity.EventEntity
-import com.derra.taskyapp.data.room.entity.ReminderEntity
-import com.derra.taskyapp.data.room.entity.TaskEntity
+import com.derra.taskyapp.data.room.entity.*
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 @Dao
 interface TaskyDao {
 
-    @Query("SELECT * FROM tasks WHERE date(time) = :day ORDER BY time ASC")
-    suspend fun getDayTasks(day: LocalDate): List<TaskEntity>
+    @Query("SELECT * FROM tasks WHERE time >= :startDateTime AND time < :endDateTime ORDER BY time ASC")
+    suspend fun getDayTasks(startDateTime: LocalDateTime, endDateTime: LocalDateTime): List<TaskEntity>
 
-    @Query("SELECT * FROM reminders WHERE date(time) = :day ORDER BY time ASC")
-    suspend fun getDayReminders(day: LocalDate): List<ReminderEntity>
+    @Query("SELECT * FROM reminders WHERE time >= :startDateTime AND time < :endDateTime ORDER BY time ASC")
+    suspend fun getDayReminders(startDateTime: LocalDateTime, endDateTime: LocalDateTime): List<ReminderEntity>
 
-    @Query("SELECT * FROM events WHERE date(startTime) = :day ORDER BY startTime ASC")
-    suspend fun getDayEvents(day: LocalDate): List<EventEntity>
+    @Query("SELECT * FROM events WHERE startTime >= :startDateTime AND startTime < :endDateTime ORDER BY startTime ASC")
+    suspend fun getDayEvents(startDateTime: LocalDateTime, endDateTime: LocalDateTime): List<EventEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: TaskEntity)
@@ -65,6 +63,14 @@ interface TaskyDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun  insertDeletes(deleteEntity: DeleteEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNotification(notificationEntity: NotificationEntity)
+    @Query("SELECT * FROM notifications WHERE id = :notificationId")
+    suspend fun getNotificationById(notificationId: String): NotificationEntity?
+
+    @Query("SELECT * FROM notifications")
+    suspend fun getAllNotifications(): List<NotificationEntity>?
 
     @Query("DELETE FROM deletes")
     suspend fun deleteAllDeletes()

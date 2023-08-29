@@ -12,7 +12,7 @@ sealed class DayTaskEvent{
     data class DifferentDaySelected(val localDate: LocalDate): DayTaskEvent()
     object AddTaskClick: DayTaskEvent()
     object AddReminderClick: DayTaskEvent()
-    data class TaskItemCheckBoxClick(val checked: Boolean, val task: Task): DayTaskEvent()
+    data class TaskItemCheckBoxClick(val task: Task): DayTaskEvent()
     data class AnotherDayClick(val dayClicked: LocalDate): DayTaskEvent()
     object UserProfileClick: DayTaskEvent()
     object OpenAgendaDialogClick: DayTaskEvent()

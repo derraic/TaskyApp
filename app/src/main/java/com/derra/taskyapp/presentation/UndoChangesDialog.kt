@@ -46,7 +46,7 @@ fun UndoChangesDialog(
 
     if (showDialog) {
         AlertDialog(
-            onDismissRequest = { onCancelClick},
+            onDismissRequest = { onCancelClick()},
             text = {
                 Column(modifier = Modifier
                     .fillMaxSize()
@@ -55,13 +55,12 @@ fun UndoChangesDialog(
                     Row(modifier = Modifier
                         .width(310.dp)
                         .height(32.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
+                        horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically)
                     {
                         Image(painter = painterResource(id = R.drawable.cross_icon), contentDescription = "Warning")
                         Text(
                             modifier = Modifier
-                                .width(245.dp)
                                 .height(24.dp),
                             text = "Are you sure?",
                             fontSize = 16.sp,
@@ -85,7 +84,7 @@ fun UndoChangesDialog(
                             modifier = Modifier
                                 .width(310.dp)
                                 .height(40.dp),
-                            text = "Do you really want to undo your changes? This process cannot be undone.",
+                            text = "Do you really want to undo your changes?",
                             fontSize = 14.sp,
                             fontFamily = FontFamily(Font(R.font.inter_regular)),
                             fontWeight = FontWeight(500),
@@ -111,7 +110,7 @@ fun UndoChangesDialog(
                             )
                             .width(151.dp)
                             .height(48.dp)
-                            .clickable { onCancelClick }
+                            .clickable { onCancelClick() }
                             .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 12.dp)
                         ) {
                             Text(
@@ -137,7 +136,7 @@ fun UndoChangesDialog(
                                     shape = RoundedCornerShape(size = 10.dp)
                                 )
                                 .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 12.dp)
-                                .clickable { onOkClick }
+                                .clickable { onOkClick() }
                             //.paint(painter = painterResource(id = R.drawable.button_got_it_good))
                         ) {
                             Text(

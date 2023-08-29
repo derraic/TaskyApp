@@ -3,33 +3,34 @@ package com.derra.taskyapp.data.mappers
 import com.derra.taskyapp.data.objectsviewmodel.Attendee
 import com.derra.taskyapp.data.objectsviewmodel.Event
 import com.derra.taskyapp.data.objectsviewmodel.Photo
+import com.derra.taskyapp.data.remote.dto.AttendeeDtoResponse
 import com.derra.taskyapp.data.room.entity.EventEntity
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 fun EventEntity.toEvent(): Event {
-    val attendeesListType = object : TypeToken<List<Attendee>>() {}.type
+    val attendeesListType = object : TypeToken<List<AttendeeDtoResponse>>() {}.type
     val photosListType = object : TypeToken<List<Photo>>() {}.type
 
-    val attendeesList: List<Attendee> = Gson().fromJson(attendeesJson, attendeesListType)
+    val attendeesList: List<AttendeeDtoResponse> = Gson().fromJson(attendeesJson, attendeesListType)
     val photosList: List<Photo> = Gson().fromJson(photosJson, photosListType)
 
     return Event(
         id = id,
         title = title,
-        description = description,
+        description = description ?: "",
         from = startTime,
         to = to,
         remindAt = remindAt,
         host = host,
         isUserEventCreator = isUserEventCreator,
-        attendees = attendeesList,
+        attendees = attendeesList.map { it.toAttendee() },
         photos = photosList
     )
 }
 
 fun Event.toEventEntity(): EventEntity {
-    val attendeesJson = Gson().toJson(attendees)
+    val attendeesJson = Gson().toJson(attendees.map { it.toAttendeeDtoResponse() })
     val photosJson = Gson().toJson(photos)
 
     return EventEntity(

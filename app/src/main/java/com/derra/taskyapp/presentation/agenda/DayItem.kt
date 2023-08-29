@@ -1,6 +1,7 @@
 package com.derra.taskyapp.presentation.agenda
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
@@ -23,11 +24,12 @@ import com.derra.taskyapp.R
 import com.derra.taskyapp.ui.theme.Shapes
 
 @Composable
-fun DayItem(isSelected: Boolean, weekDayInitial: String, dayInitial: String) {
+fun DayItem(isSelected: Boolean, weekDayInitial: String, dayInitial: String, onClick: () -> Unit) {
 
 
     Column(
         modifier = Modifier
+            .clickable { onClick() }
             .width(40.dp)
             .height(61.dp)
             .background(

@@ -1,6 +1,7 @@
 package com.derra.taskyapp
 
 import android.os.Bundle
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,12 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
+import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,26 +37,30 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
         setContent {
             TaskyAppTheme {
                 val navController = rememberNavController()
+                NavControllerHolder.setNavController(navController)
 
                 NavHost(navController = navController, startDestination = Routes.SPLASH_SCREEN) {
                     composable(Routes.SPLASH_SCREEN)
                     {
-                        SplashScreen(onNavigate = {navController.navigate(it.route)})
+                        SplashScreen(onNavigate = {navController.navigate(it.route)}, window = window)
                     }
                     composable(Routes.LOGIN_SCREEN){
-                        LoginScreen(onNavigate = {navController.navigate(it.route)})
+                        LoginScreen(onNavigate = {navController.navigate(it.route)}, window = window)
                         
                     }
                     composable(Routes.REGISTER_SCREEN) {
-                        RegisterScreen(onPopBackStack = {navController.popBackStack()})
+                        RegisterScreen(onPopBackStack = {navController.popBackStack()}, window = window)
                     }
                     composable(Routes.DAY_TASKS_SCREEN) {
-                        DayTasksScreen(onNavigate = {navController.navigate(it.route)}, onPopBackStack = {navController.popBackStack()})
+
+                        DayTasksScreen(onNavigate = {navController.navigate(it.route)}, onPopBackStack = {navController.popBackStack()}, window = window)
                     }
-                    composable(Routes.EDIT_DETAIL_EVENT_SCREEN + "?eventId={eventId}" + "?isEditable={isEditable}",
+                    composable(Routes.EDIT_DETAIL_EVENT_SCREEN + "?eventId={eventId}" + "&isEditable={isEditable}",
                         arguments = listOf(navArgument(name = "eventId") {
                             type = NavType.StringType
                             defaultValue = "NONE"
@@ -58,9 +69,9 @@ class MainActivity : ComponentActivity() {
                             defaultValue = false
                         })
                     ) {
-                        EventScreen(onPopBackStack = { navController.popBackStack()})
+                        EventScreen(onPopBackStack = { navController.popBackStack()}, context = this@MainActivity, window = window)
                     }
-                    composable(Routes.EDIT_DETAIL_TASK_SCREEN + "?={taskId}" + "?iEditable={isEditable}",
+                    composable(Routes.EDIT_DETAIL_TASK_SCREEN + "?taskId={taskId}" + "&isEditable={isEditable}",
                         arguments = listOf(navArgument(name = "taskId") {
                             type = NavType.StringType
                             defaultValue = "NONE"
@@ -69,9 +80,10 @@ class MainActivity : ComponentActivity() {
                             defaultValue = false
                         })
                     ) {
-                        TaskScreen(onPopBackStack = { navController.popBackStack()})
+
+                        TaskScreen(onPopBackStack = { navController.popBackStack()}, window = window)
                     }
-                    composable(Routes.EDIT_DETAIL_REMINDER_SCREEN + "?={reminderId}" + "?iEditable={isEditable}",
+                    composable(Routes.EDIT_DETAIL_REMINDER_SCREEN + "?reminderId={reminderId}" + "&isEditable={isEditable}",
                         arguments = listOf(navArgument(name = "reminderId") {
                             type = NavType.StringType
                             defaultValue = "NONE"
@@ -80,11 +92,13 @@ class MainActivity : ComponentActivity() {
                             defaultValue = false
                         })
                     ) {
-                        ReminderScreen(onPopBackStack = { navController.popBackStack()})
+
+                        ReminderScreen(onPopBackStack = { navController.popBackStack()}, window = window)
                     }
                 }
 
             }
         }
     }
+
 }

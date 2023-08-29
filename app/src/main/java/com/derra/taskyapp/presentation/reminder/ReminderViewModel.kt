@@ -1,15 +1,19 @@
 package com.derra.taskyapp.presentation.reminder
 
+import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.derra.taskyapp.data.NotificationAlarmScheduler
 import com.derra.taskyapp.data.TaskyRepository
 import com.derra.taskyapp.data.mappers.toReminderEntity
 import com.derra.taskyapp.data.objectsviewmodel.Reminder
 import com.derra.taskyapp.data.remote.dto.LoginResponseDto
+import com.derra.taskyapp.data.room.entity.NotificationEntity
 import com.derra.taskyapp.util.Resource
 import com.derra.taskyapp.util.UiEvent
 import com.derra.taskyapp.util.UserManager
@@ -29,6 +33,7 @@ import javax.inject.Inject
 class ReminderViewModel @Inject constructor(
     private val repository: TaskyRepository,
     private val userManager: UserManager,
+    private val context: Context,
     savedStateHandle: SavedStateHandle
 ): ViewModel() {
 
@@ -79,11 +84,13 @@ class ReminderViewModel @Inject constructor(
         val reminderId = savedStateHandle.get<String>("reminderId")!!
         val isEditable = savedStateHandle.get<Boolean>("isEditable")!!
         token = getLoginResponse()!!.token
+        token = "Bearer $token"
+
+        Log.d("TEST", "This is isEditable: $isEditable")
+        editMode = isEditable
 
 
-        if (isEditable) {
-            editMode = true
-        }
+
 
         if (reminderId != "NONE") {
             newReminder = false
@@ -93,7 +100,7 @@ class ReminderViewModel @Inject constructor(
                     when (resource) {
                         is Resource.Success -> {
                             reminder = resource.data
-                            title = reminder?.id ?: ""
+                            title = reminder?.title ?: ""
                             description = reminder?.description ?: ""
                             dateTime = reminder?.time!!
                             remindAt = reminder?.remindAt!!
@@ -129,6 +136,7 @@ class ReminderViewModel @Inject constructor(
 
 
     }
+    private val scheduler = NotificationAlarmScheduler(context)
 
     fun onEvent(event: ReminderEvent) {
         when (event) {
@@ -171,7 +179,7 @@ class ReminderViewModel @Inject constructor(
                 tempString = description
             }
             is ReminderEvent.EditTimeClick -> {
-                editTitleMode = true
+                timeDialog = true
 
             }
 
@@ -188,22 +196,35 @@ class ReminderViewModel @Inject constructor(
             is ReminderEvent.SaveNewDescriptionClick -> {
                 description = tempString
                 tempString = ""
+                editDescriptionMode = false
             }
             is ReminderEvent.SaveNewTitleClick -> {
                 title = tempString
                 tempString = ""
+                editTitleMode = false
 
             }
             is ReminderEvent.SaveButtonClick -> {
                 if (newReminder) {
                     viewModelScope.launch {
-                        repository.createReminder(token, Reminder(id = UUID.randomUUID().toString(), title = title, description = description, time = dateTime, remindAt = remindAt).toReminderEntity())
+                        val id = UUID.randomUUID().toString()
+                        repository.createReminder(token, Reminder(id = id,
+                            title = title, description = description, time = dateTime, remindAt = remindAt).toReminderEntity())
+                        val notification = NotificationEntity(id = id, name = title, description = description, itemType = 1, remindAt)
+                        notification.let(scheduler::schedule)
+                        repository.insertNotification(notification)
                     }
+
 
                 }
                 else {
                     viewModelScope.launch {
-                        repository.updateReminder(token, Reminder(id = reminder!!.id, title = title, description = description, time = dateTime, remindAt = remindAt).toReminderEntity())
+                        repository.updateReminder(token, Reminder(id = reminder!!.id, title = title,
+                            description = description, time = dateTime, remindAt = remindAt).toReminderEntity())
+                        val notification = NotificationEntity(id = reminder!!.id, name = title, description = description,
+                            itemType = 1, remindAt)
+                        notification.let(scheduler::schedule)
+                        repository.insertNotification(notification)
                     }
                 }
 
@@ -243,11 +264,16 @@ class ReminderViewModel @Inject constructor(
                 if (reminder != null) {
                     viewModelScope.launch {
                         repository.deleteReminderItem(token, reminderId = reminder!!.id)
+                        val notification = repository.getNotificationById(reminder!!.id)
+                        notification?.let(scheduler::cancel)
+
                     }
+                    sendUiEvent(UiEvent.PopBackStack)
                 }
                 else {
                     sendUiEvent(UiEvent.PopBackStack)
                 }
+
 
             }
         }

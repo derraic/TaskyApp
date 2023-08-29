@@ -1,6 +1,10 @@
 package com.derra.taskyapp.presentation.event
 
+import android.net.Uri
+import android.util.Log
 import android.widget.Space
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -18,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -26,9 +33,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import coil.compose.rememberAsyncImagePainter
+import coil.compose.rememberImagePainter
 import com.derra.taskyapp.R
 import com.derra.taskyapp.presentation.EditDescriptionScreen
 import com.derra.taskyapp.presentation.EditTitleScreen
+import com.derra.taskyapp.presentation.ReminderDropDown
 import com.derra.taskyapp.presentation.agenda.DeleteItemDialog
 import com.derra.taskyapp.presentation.agenda.UndoChangesDialog
 import com.derra.taskyapp.presentation.reminder.ReminderEvent
@@ -42,11 +53,22 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EventEditableHostScreen(viewModel: EventViewModel) {
+fun EventEditableHostScreen(viewModel: EventViewModel,
+                            window: android.view.Window
+) {
+
+    WindowCompat.setDecorFitsSystemWindows(window, true)
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        Log.d("URI", "THIs Is the URi: $uri")
+        if (uri != null) {
+            viewModel.onEvent(EventEvent.OnImageChange(uri))
+        }
+    }
 
     val initialDateMillis = viewModel.fromDate.toEpochDay() * 24 * 60 * 60 * 1000
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialDateMillis)
     val initialTime = viewModel.fromTime ?: LocalTime.now()
+    val dialogState = rememberMaterialDialogState()
 
     if (viewModel.editDescriptionMode) {
         EditDescriptionScreen(
@@ -63,6 +85,9 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
             onBackClick = { viewModel.onEvent(EventEvent.OnBackButtonTextFieldClick) },
             tempString = viewModel.tempString
         )
+    }
+    else if (viewModel.photoScreenOpen){
+        PhotoDetailScreen(viewModel = viewModel, viewModel.photoToOpen!!, window)
     }
     else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -112,7 +137,12 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                     )
                 }
 
-                LazyColumn() {
+                LazyColumn(modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = Color(0xFFFFFFFF),
+                        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+                    )) {
                     this.item {
 
                         Row(
@@ -145,11 +175,13 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                         }
                         Spacer(modifier = Modifier.height(30.5.dp))
                         Row(
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 17.dp, end = 17.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row() {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
 
                                 Image(
                                     painter = painterResource(id = R.drawable.circle_checked_task),
@@ -158,19 +190,21 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
 
                                 Spacer(modifier = Modifier.width(9.dp))
                                 Text(
-                                    text = viewModel.title,
+                                    text = if (viewModel.title.isBlank()) "Title" else viewModel.title,
                                     style = TextStyle(
                                         fontSize = 26.sp,
                                         lineHeight = 25.sp,
                                         fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                        fontWeight = FontWeight(700),
-                                        color = Color(0xFF16161C),
+                                        fontWeight = if (viewModel.title.isBlank()) FontWeight(700) else FontWeight(500),
+                                        color = if (viewModel.title.isBlank()) Color(0xFFA9B4BE) else Color(
+                                            0xFF16161C
+                                        ),
                                     )
                                 )
+                            }
 
                                 Box(modifier = Modifier
                                     .width(30.dp)
-                                    .height(30.35489.dp)
                                     .clickable {
                                         viewModel.onEvent(EventEvent.EditTitleClick)
                                     }
@@ -181,38 +215,37 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                                     )
 
                                 }
-                            }
+
 
 
                         }
                         Spacer(modifier = Modifier.height(22.dp))
-                        Modifier
+                        Spacer(modifier = Modifier
                             .padding(horizontal = 17.dp)
-                            .width(326.dp)
+                            .fillMaxWidth()
                             .height(1.dp)
-                            .background(color = Color(0xFFEEF6FF))
+                            .background(color = Color(0xFFEEF6FF)))
                         Row(
                             modifier = Modifier
-                                .height(87.dp)
-                                .padding(start = 17.dp, end = 16.dp, top = 17.dp),
-                            verticalAlignment = Alignment.Top,
+                                .fillMaxWidth()
+                                .padding(start = 17.dp, end = 17.dp,top = 17.dp, bottom = 30.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
 
                             Text(
-                                text = viewModel.description,
+                                text = if (viewModel.description.isBlank()) "Description" else viewModel.description,
                                 style = TextStyle(
                                     fontSize = 16.sp,
                                     lineHeight = 15.sp,
                                     fontFamily = FontFamily(Font(R.font.inter_regular)),
                                     fontWeight = FontWeight(400),
-                                    color = Color(0xFF16161C),
+                                    color = if (viewModel.description.isBlank()) Color(0xFFA9B4BE) else Color(0xFF16161C),
                                 )
                             )
 
                             Box(modifier = Modifier
                                 .width(30.dp)
-                                .height(30.35489.dp)
                                 .clickable {
                                     viewModel.onEvent(EventEvent.EditDescriptionClick)
                                 }
@@ -238,13 +271,14 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(modifier = Modifier.clickable {
-                                    TODO()
-                                }) {
+                                    viewModel.onEvent(EventEvent.AddPhotoClick(galleryLauncher))
+                                }, verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
                                             .width(30.dp)
                                             .height(30.dp), contentAlignment = Alignment.Center
                                     ) {
+
                                         Image(
                                             painter = painterResource(id = R.drawable.plus_icon_add_photos),
                                             contentDescription = "add"
@@ -285,7 +319,63 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                                     )
                                 )
                                 Spacer(Modifier.height(21.dp))
-                                LazyRow(modifier = Modifier.height(60.dp)) {
+                                LazyRow(modifier = Modifier.height(61.dp)) {
+                                    items(viewModel.photos) {photo ->
+                                        Box(modifier = Modifier
+                                            .border(
+                                                width = 3.dp,
+                                                color = Color(0xFFB7C6DE),
+                                                shape = RoundedCornerShape(size = 5.dp)
+                                            )
+                                            .clickable {
+                                                viewModel.onEvent(
+                                                    EventEvent.PhotoScreenOpenClick(
+                                                        photo
+                                                    )
+                                                )
+                                            }
+                                            .padding(1.5.dp)
+                                            .width(60.dp)
+                                            .height(60.dp)) {
+
+                                            Log.d("TESTINEVENT", "this is the photokey: ${photo.key}")
+                                            if (photo.key.startsWith("picture")){
+                                                Log.d("TESTINEVENT", "this is the photourl: ${photo.url}")
+                                                val painter: Painter = rememberAsyncImagePainter(viewModel.retrieveSavedImageUriByFileName(photo.url))
+                                                Image(painter = painter, contentDescription = "event image"
+                                                    ,modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
+                                            }
+                                            else {
+                                                Image(
+                                                    painter = rememberAsyncImagePainter(photo.url),
+                                                    contentDescription = "Event Photo",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.FillBounds,
+
+                                                )
+
+
+                                            }
+
+
+
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+
+                                    }
+                                    item {
+                                        Box(modifier = Modifier
+                                            .width(61.dp)
+                                            .height(61.dp)
+                                            .clickable { viewModel.onEvent(EventEvent.AddPhotoClick(galleryLauncher)) }
+                                        ) {
+                                            Image(painter = painterResource(id = R.drawable.add_image_picture), contentDescription = "add image" )
+                                            
+                                        }
+
+                                    }
+
 
                                 }
 
@@ -305,107 +395,197 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 17.dp)
-                                .height(70.00003.dp)
+                                .padding(start = 17.dp, end = 30.dp)
+                                .height(70.dp)
                                 .padding(start = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "From",
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    lineHeight = 15.sp,
-                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                    fontWeight = FontWeight(400),
-                                    color = Color(0xFF16161C),
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "From",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF16161C),
+                                    )
                                 )
-                            )
-                            Spacer(modifier = Modifier.width(39.dp))
-                            val time = viewModel.fromDateTime.toLocalTime()
-                                .format(DateTimeFormatter.ofPattern("HH::mm"))
-                            Text(
-                                modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditFromTimeClick) },
-                                text = time,
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    lineHeight = 15.sp,
-                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                    fontWeight = FontWeight(400),
-                                    color = Color(0xFF16161C),
+                                Spacer(modifier = Modifier.width(17.dp))
+                                val time = viewModel.fromDateTime.toLocalTime()
+                                    .format(DateTimeFormatter.ofPattern("HH:mm"))
+                                Text(
+                                    modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditFromTimeClick)
+                                                                    dialogState.show()
+                                                                  },
+                                    text = time,
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF16161C),
+                                    )
                                 )
-                            )
-                            Spacer(modifier = Modifier.width(82.dp))
+                                Spacer(modifier = Modifier.width(28.dp))
+                                Box(modifier = Modifier
+                                    .clickable { viewModel.onEvent(EventEvent.EditFromTimeClick)
+                                        dialogState.show()
+                                    }
+                                    .height(30.dp)
+                                    .width(30.dp), contentAlignment = Alignment.Center) {
+                                    Image(painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit")
 
-                            val formatter =
-                                DateTimeFormatter.ofPattern("MMM dd yyyy", Locale.ENGLISH)
-                            val date = viewModel.fromDateTime.toLocalDate().format(formatter)
-                            Text(
-                                modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditFromDateClick) },
-                                text = date,
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    lineHeight = 15.sp,
-                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                    fontWeight = FontWeight(400),
-                                    color = Color(0xFF16161C),
+                                }
+                                Spacer(modifier = Modifier.width(24.dp))
+
+                                val formatter =
+                                    DateTimeFormatter.ofPattern("MMM dd yyyy", Locale.ENGLISH)
+                                val date = viewModel.fromDateTime.toLocalDate().format(formatter)
+                                Text(
+                                    modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditFromDateClick) },
+                                    text = date,
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF16161C),
+                                    )
                                 )
-                            )
+                            }
+
+                            Box(modifier = Modifier
+                                .clickable { viewModel.onEvent(EventEvent.EditFromDateClick) }
+                                .height(30.dp)
+                                .width(30.dp), contentAlignment = Alignment.Center) {
+                                Image(painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit")
+
+                            }
+
                         }
                         Spacer(
                             modifier = Modifier
                                 .padding(horizontal = 17.dp)
-                                .width(326.dp)
+                                .fillMaxWidth()
                                 .height(1.dp)
                                 .background(color = Color(0xFFEEF6FF))
                         )
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 17.dp)
-                                .height(70.00003.dp)
-                                .padding(start = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(start = 17.dp, end = 30.dp)
+                                .height(70.dp)
+                                ,
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "To",
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    lineHeight = 15.sp,
-                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                    fontWeight = FontWeight(400),
-                                    color = Color(0xFF16161C),
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "To",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF16161C),
+                                    )
                                 )
-                            )
-                            Spacer(modifier = Modifier.width(39.dp))
-                            val toTime = viewModel.toDateTime.toLocalTime()
-                                .format(DateTimeFormatter.ofPattern("HH::mm"))
-                            Text(
-                                modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditFromTimeClick) },
-                                text = toTime,
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    lineHeight = 15.sp,
-                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                    fontWeight = FontWeight(400),
-                                    color = Color(0xFF16161C),
+                                Spacer(modifier = Modifier.width(37.dp))
+                                val toTime = viewModel.toDateTime.toLocalTime()
+                                    .format(DateTimeFormatter.ofPattern("HH:mm"))
+                                Text(
+                                    modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditToTimeClick)
+                                                                  dialogState.show()},
+                                    text = toTime,
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF16161C),
+                                    )
                                 )
-                            )
-                            Spacer(modifier = Modifier.width(82.dp))
+                                Spacer(modifier = Modifier.width(28.dp))
+                                Box(modifier = Modifier
+                                    .clickable { viewModel.onEvent(EventEvent.EditToTimeClick)
+                                    dialogState.show()}
+                                    .height(30.dp)
+                                    .width(30.dp), contentAlignment = Alignment.Center) {
+                                    Image(painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit")
 
-                            val formatter =
-                                DateTimeFormatter.ofPattern("MMM dd yyyy", Locale.ENGLISH)
-                            val toDate = viewModel.fromDateTime.toLocalDate().format(formatter)
-                            Text(
-                                modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditFromDateClick) },
-                                text = toDate,
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    lineHeight = 15.sp,
-                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                    fontWeight = FontWeight(400),
-                                    color = Color(0xFF16161C),
+                                }
+                                Spacer(modifier = Modifier.width(24.dp))
+
+                                val formatter =
+                                    DateTimeFormatter.ofPattern("MMM dd yyyy", Locale.ENGLISH)
+                                val toDate = viewModel.toDateTime.toLocalDate().format(formatter)
+                                Text(
+                                    modifier = Modifier.clickable { viewModel.onEvent(EventEvent.EditToDateClick) },
+                                    text = toDate,
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF16161C),
+                                    )
                                 )
-                            )
+                            }
+
+
+                            Box(modifier = Modifier
+                                .clickable { viewModel.onEvent(EventEvent.EditToDateClick) }
+                                .height(30.dp)
+                                .width(30.dp), contentAlignment = Alignment.Center) {
+                                Image(painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit")
+
+                            }
+                        }
+                        Row(modifier = Modifier
+                            .height(70.00003.dp)
+                            .fillMaxWidth()
+                            .padding(start = 17.dp, end = 30.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(painter = painterResource(id = R.drawable.bell_icon_in_box), contentDescription = "notification")
+                                Spacer(modifier = Modifier.width(13.dp))
+
+                                Text(
+                                    modifier = Modifier.width(139.dp),
+                                    text = viewModel.giveReminderString(viewModel.minutesBefore),
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF16161C),
+                                    )
+                                )
+                            }
+
+
+                            Column () {
+                                Box (modifier = Modifier
+                                    .width(30.dp)
+                                    .height(30.dp)
+                                    .clickable { viewModel.onEvent(EventEvent.AdjustNotificationClick) }, contentAlignment = Alignment.Center) {
+                                    Image(modifier = Modifier
+                                        ,painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit?")
+                                }
+                                ReminderDropdownReal(
+                                    expanded = viewModel.reminderDropDown,
+                                    onDissmissRequest = { viewModel.onEvent(EventEvent.ReminderTimeDismiss)},
+                                    onItemClick = {minutesBefore -> viewModel.onEvent(EventEvent.DifferentReminderTimeClick(minutesBefore))}
+                                )
+                            }
+
+
+
+
                         }
                         Spacer(
                             modifier = Modifier
@@ -434,6 +614,7 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                             Box(modifier = Modifier
                                 .width(35.dp)
                                 .height(35.dp)
+                                .clickable { viewModel.onEvent(EventEvent.AddAttendeeModalOpen) }
                                 .background(
                                     color = Color(0xFFF2F3F7),
                                     shape = RoundedCornerShape(size = 5.dp)
@@ -450,12 +631,12 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                         Row(modifier = Modifier
                             .fillMaxWidth()
                             .height(30.dp)
-                            .padding(horizontal = 17.dp)) {
+                            .padding(horizontal = 17.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                             Box(
                                 modifier = Modifier
                                     .width(100.dp)
                                     .height(30.dp)
-                                    .clickable { TODO() }
+                                    .clickable { viewModel.onEvent(EventEvent.GoingButtonClick(0)) }
                                     .background(
                                         color = if (viewModel.visitorsButtonSelected == 0) Color(
                                             0xFF16161C
@@ -480,7 +661,7 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                                 modifier = Modifier
                                     .width(100.dp)
                                     .height(30.dp)
-                                    .clickable { TODO() }
+                                    .clickable { viewModel.onEvent(EventEvent.GoingButtonClick(1)) }
                                     .background(
                                         color = if (viewModel.visitorsButtonSelected == 1) Color(
                                             0xFF16161C
@@ -505,7 +686,7 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
                                 modifier = Modifier
                                     .width(100.dp)
                                     .height(30.dp)
-                                    .clickable { TODO() }
+                                    .clickable { viewModel.onEvent(EventEvent.GoingButtonClick(2)) }
                                     .background(
                                         color = if (viewModel.visitorsButtonSelected == 2) Color(
                                             0xFF16161C
@@ -545,38 +726,222 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
 
                         }
                         Spacer(modifier = Modifier.height(15.dp))
-                        viewModel.attendees.
-                        filter { attendee -> if (viewModel.visitorsButtonSelected != 2) attendee.isGoing else !attendee.isGoing }
-                            .forEach { it ->
+                        viewModel.attendees
+                            .sortedByDescending { it.userId == viewModel.hostId }
+                            .filter { attendee -> if (viewModel.visitorsButtonSelected != 2) attendee.isGoing else !attendee.isGoing }
+                            .forEach {
+
                                 Row(modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
+                                    .height(46.dp)
                                     .paint(
                                         painter = painterResource(
                                             id = R.drawable.visitors_box
 
                                         )
-                                    ).padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    )
+                                    .padding(
+                                        start = 10.dp,
+                                        end = if (it.userId == viewModel.hostId) 17.dp else 15.dp
+                                    ),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Box(
 
+                                            modifier = Modifier.padding(start = 10.dp)
+                                                .width(32.dp)
+                                                .height(32.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.circled_avatar_user),
+                                                contentDescription = "avatar circle"
+                                            )
+                                            Text(
+                                                text = viewModel.getNameInitials(it.fullName),
+                                                style = TextStyle(
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 14.4.sp,
+                                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                                    fontWeight = FontWeight(600),
+                                                    color = Color(0xFFFFFFFF),
+                                                )
+                                            )
 
+                                        }
+                                        Spacer(modifier = Modifier.width(15.dp))
+                                        Text(
+                                            text = it.fullName,
+                                            style = TextStyle(
+                                                fontSize = 14.sp,
+                                                lineHeight = 12.sp,
+                                                fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                                fontWeight = FontWeight(500),
+                                                color = Color(0xFF5C5D5A),
+                                            )
+                                        )
+                                    }
+                                        if (it.userId == viewModel.hostId) {
 
+                                            Text(
+                                                modifier = Modifier.padding(end = 17.dp, start = 63.dp),
+                                                text = "creator",
+                                                style = TextStyle(
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 15.sp,
+                                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                                    fontWeight = FontWeight(500),
+                                                    color = Color(0xFFB7C6DE),
+                                                )
+                                            )
+                                        }
+                                        else {
+                                            Box(modifier = Modifier.padding(end = 15.dp, start = 65.dp)
+                                                .clickable {
+                                                    viewModel.onEvent(
+                                                        EventEvent.DeleteAttendeeClick(
+                                                            it
+                                                        )
+                                                    )
+                                                }) {
+                                                Image(
+                                                    painter = painterResource(id = R.drawable.trash_can_icon_to_delete_attendees
+                                                    ), contentDescription = "delete")
+                                            }
 
+                                        }
 
 
 
                                     
                                 }
+                                Spacer(modifier = Modifier.height(5.dp))
                             }
 
-                        
+                        if (viewModel.visitorsButtonSelected == 0 ) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 18.dp)
+                            ) {
+                                Text(
+                                    text = "Not going",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(500),
+                                        color = Color(0xFF5C5D5A),
+                                    )
+                                )
+                            }
 
-                        
+                            Spacer(modifier = Modifier.height(15.dp))
+                            viewModel.attendees.filter { attendee -> !attendee.isGoing }
+                                .forEach {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 17.dp)
+                                            .height(46.dp)
+                                            .paint(
+                                                painter = painterResource(
+                                                    id = R.drawable.visitors_box
+
+                                                )
+                                            )
+                                            .padding(
+                                                start = 10.dp,
+                                                end = if (it.userId == viewModel.hostId) 17.dp else 15.dp
+                                            ),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(start = 10.dp)
+                                                    .width(32.dp)
+                                                    .height(32.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Image(
+                                                    painter = painterResource(id = R.drawable.circled_avatar_user),
+                                                    contentDescription = "avatar circle"
+                                                )
+                                                Text(
+                                                    text = viewModel.getNameInitials(it.fullName),
+                                                    style = TextStyle(
+                                                        fontSize = 12.sp,
+                                                        lineHeight = 14.4.sp,
+                                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                                        fontWeight = FontWeight(600),
+                                                        color = Color(0xFFFFFFFF),
+                                                    )
+                                                )
+
+                                            }
+                                            Spacer(modifier = Modifier.width(15.dp))
+                                            Text(
+                                                text = it.fullName,
+                                                style = TextStyle(
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 12.sp,
+                                                    fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                                    fontWeight = FontWeight(500),
+                                                    color = Color(0xFF5C5D5A),
+                                                )
+                                            )
+                                        }
+
+
+                                            Box(modifier = Modifier
+                                                .padding(end = 15.dp, start = 65.dp)
+                                                .clickable {
+                                                    viewModel.onEvent(
+                                                        EventEvent.DeleteAttendeeClick(
+                                                            it
+                                                        )
+                                                    )
+                                                }
+                                                ) {
+                                                Image(
+                                                    painter = painterResource(
+                                                        id = R.drawable.trash_can_icon_to_delete_attendees
+                                                    ), contentDescription = "delete"
+                                                )
+                                            }
 
 
 
 
+                                    }
+                                    Spacer(modifier = Modifier.height(5f.dp))
 
 
+
+                                }
+                        }
+                            Spacer(modifier = Modifier.height(45.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                Text(
+                                    modifier = Modifier.clickable { viewModel.onEvent(EventEvent.DeleteEventClick) },
+                                    text = "DELETE EVENT",
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        lineHeight = 30.sp,
+                                        fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                        fontWeight = FontWeight(600),
+                                        color = Color(0xFFA9B4BE),
+                                    )
+                                )
+
+
+                            }
+                            
 
 
 
@@ -587,6 +952,9 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
 
             }
 
+            if (viewModel.addAttendeeModal) {
+                AddAttendeeModal(viewModel = viewModel)
+            }
             if (viewModel.newEvent && viewModel.deleteDialog) {
                 UndoChangesDialog(
                     modifier = Modifier,
@@ -638,14 +1006,16 @@ fun EventEditableHostScreen(viewModel: EventViewModel) {
             }
 
 
-            val dialogState = rememberMaterialDialogState()
+
             MaterialDialog(
                 dialogState = dialogState,
                 buttons = {
                     positiveButton("Ok") {
+                        dialogState.hide()
                         viewModel.onEvent(EventEvent.OnTimeSave)
                     }
                     negativeButton("Cancel") {
+                        dialogState.hide()
                         viewModel.onEvent(EventEvent.OnTimeDismiss)
                     }
                 }

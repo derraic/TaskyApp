@@ -1,22 +1,23 @@
 package com.derra.taskyapp.data
 
-import android.media.session.MediaSession.Token
+import android.content.Context
+import android.util.Log
 import com.derra.taskyapp.data.mappers.*
 import com.derra.taskyapp.data.mappers_dto_to_entity.*
 import com.derra.taskyapp.data.objectsviewmodel.*
 import com.derra.taskyapp.data.remote.TaskyApi
 import com.derra.taskyapp.data.remote.dto.*
 import com.derra.taskyapp.data.room.TaskyDao
-import com.derra.taskyapp.data.room.entity.DeleteEntity
-import com.derra.taskyapp.data.room.entity.EventEntity
-import com.derra.taskyapp.data.room.entity.ReminderEntity
-import com.derra.taskyapp.data.room.entity.TaskEntity
+import com.derra.taskyapp.data.room.entity.*
 import com.derra.taskyapp.util.Resource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import retrofit2.Call
 import retrofit2.HttpException
+import java.io.File
 import java.io.IOException
 import java.time.Instant
 import java.time.LocalDateTime
@@ -25,7 +26,13 @@ import javax.inject.Inject
 
 class TaskyRepositoryImpl @Inject constructor(
     private val taskyApi: TaskyApi,
-    private val dao: TaskyDao) : TaskyRepository {
+    private val dao: TaskyDao,
+    private val context: Context
+    ) : TaskyRepository {
+    override suspend fun getAllNotifications(): List<NotificationEntity>? {
+        return dao.getAllNotifications()
+    }
+
     override fun registerUser(registrationRequest: RegistrationDto): Call<Void> {
         return taskyApi.registerUser(TaskyApi.API_KEY,registrationRequest)
     }
@@ -48,15 +55,20 @@ class TaskyRepositoryImpl @Inject constructor(
         return flow {
             emit(Resource.Loading(true))
             val dayWithTime = convertUtcTimestampToLocalDateTime(time, timeZone).toLocalDate()
-            val localTasks = dao.getDayTasks(day = dayWithTime).map { it.toTask() }
-            val localReminders = dao.getDayReminders(day = dayWithTime).map { it.toReminder() }
-            val localEvents = dao.getDayEvents(day = dayWithTime).map { it.toEvent() }
+            val startOfDay = dayWithTime.atStartOfDay()
+            val startOfNextDay = dayWithTime.plusDays(1).atStartOfDay()
+
+            val localTasks = dao.getDayTasks(startOfDay, startOfNextDay).map { it.toTask() }
+            Log.d("this is", "Local tasks size: ${localTasks.size}")
+            val localReminders = dao.getDayReminders(startOfDay, startOfNextDay).map { it.toReminder() }
+            val localEvents = dao.getDayEvents(startOfDay, startOfNextDay).map { it.toEvent() }
             val agendaItems = AgendaItems(localEvents,localReminders,localTasks)
             emit(Resource.Success(agendaItems))
 
             val remoteItems = try {
                 val response = taskyApi.getAgenda(token = token, timezone = timeZone, time = time)
                 if (response.isSuccessful) {
+                    Log.d(("KK"), "KK")
                     response.body()
                 }else  {
                     null
@@ -72,15 +84,20 @@ class TaskyRepositoryImpl @Inject constructor(
                 ))
                 null
             }
+            Log.d("KK", "KK this is ${remoteItems?.events?.size ?: "null"}")
             remoteItems?.let {
                 val events: List<EventEntity> = remoteItems.events.map { it.toEventEntity() }
                 val tasks: List<TaskEntity> = remoteItems.tasks.map { it.toTaskEntity() }
                 val reminders: List<ReminderEntity> = remoteItems.reminders.map { it.toReminderEntity() }
+                val deletedIds = dao.getDeletes().map { it.id }
                 events.let { eventEntities ->
                     for (eventEntity in eventEntities) {
                         val event = dao.getEventById(eventEntity.id)
                         if (event == null || !event.needsSync) {
-                            dao.insertEvent(eventEntity)
+                            if (eventEntity.id !in deletedIds) {
+                                dao.insertEvent(eventEntity)
+                            }
+
                         }
 
                     }
@@ -89,7 +106,10 @@ class TaskyRepositoryImpl @Inject constructor(
                     for (taskEntity in taskEntities) {
                         val task = dao.getTaskById(taskEntity.id)
                         if (task == null || !task.needsSync) {
-                            dao.insertTask(taskEntity)
+                            if (taskEntity.id !in deletedIds) {
+                                dao.insertTask(taskEntity)
+                            }
+
                         }
 
                     }
@@ -98,15 +118,18 @@ class TaskyRepositoryImpl @Inject constructor(
                     for (reminderEntity in reminderEntities) {
                         val reminder = dao.getReminderById(reminderEntity.id)
                         if (reminder == null || !reminder.needsSync) {
-                            dao.insertReminder(reminderEntity)
+                            if (reminderEntity.id !in deletedIds) {
+                                dao.insertReminder(reminderEntity)
+                            }
+
                         }
 
                     }
                 }
 
-                val newLocalTasks = dao.getDayTasks(day = dayWithTime).map { it.toTask() }
-                val newLocalReminders = dao.getDayReminders(day = dayWithTime).map { it.toReminder() }
-                val newLocalEvents = dao.getDayEvents(day = dayWithTime).map { it.toEvent() }
+                val newLocalTasks = dao.getDayTasks(startOfDay, startOfNextDay).map { it.toTask() }
+                val newLocalReminders = dao.getDayReminders(startOfDay, startOfNextDay).map { it.toReminder() }
+                val newLocalEvents = dao.getDayEvents(startOfDay, startOfNextDay).map { it.toEvent() }
                 val newAgendaItems = AgendaItems(newLocalEvents,newLocalReminders,newLocalTasks)
                 emit(Resource.Success(newAgendaItems))
 
@@ -118,31 +141,32 @@ class TaskyRepositoryImpl @Inject constructor(
 
 
 
-    override suspend fun syncAgenda(token: String, userId: String){
+    override suspend fun syncAgenda(token: String){
         try {
             val eventsToSync = dao.getSyncEvents()
             val tasksToSync = dao.getSyncTasks()
             val remindersToSync = dao.getSyncReminders()
 
             val deletedItems = dao.getDeletes()
+
             val response = taskyApi.syncAgenda(
                 token = token,
                 deletedItems = SyncAgendaDto(deletedEventIds = deletedItems.filter { it.type == "EVENT" }.map { it.id },
                     deletedReminderIds = deletedItems.filter { it.type == "REMINDER" }.map { it.id },
                     deletedTaskIds = deletedItems.filter { it.type == "TASK" }.map { it.id })
             )
-            var counter = 0
+
             if (response.isSuccessful) {
                 dao.deleteAllDeletes()
-                counter++
+
             }
 
 
             eventsToSync.filter { it.kindOfSync == "UPDATE" }.forEach {event ->
-                val eventEnt = taskyApi.updateEvent(token = token, eventRequest = event.toEventUpdateDto(dao, userId), photos = emptyList())
+                val eventEnt = taskyApi.updateEvent(token = token, eventRequest = event.toEventUpdateDto(dao), photos = emptyList())
                 if (eventEnt.isSuccessful) {
                     if (eventEnt.body() != null) {
-                        dao.insertEvent(eventEnt.body()!!.toEventEntity())
+                        dao.insertEvent(eventEnt.body()!!.toEventEntity().copy(needsSync = false))
 
                     }
 
@@ -169,12 +193,13 @@ class TaskyRepositoryImpl @Inject constructor(
                 val eventEnt = taskyApi.createEvent(token = token, eventRequest = event.toEventDto(), photos = emptyList())
                 if (eventEnt.isSuccessful) {
                     if (eventEnt.body() != null) {
-                        dao.insertEvent(eventEnt.body()!!.toEventEntity())
+                        dao.insertEvent(eventEnt.body()!!.toEventEntity().copy(needsSync = false))
                     }
 
                 }
             }
             tasksToSync.filter { it.kindOfSync == "POST" }.forEach { task ->
+
                 val response = taskyApi.createTask(token = token, task = task.toTaskDto())
                 if (response.isSuccessful) {
                     dao.insertTask(task.copy(needsSync = false))
@@ -190,9 +215,9 @@ class TaskyRepositoryImpl @Inject constructor(
 
 
             }
-            if (counter == 1 + remindersToSync.size + tasksToSync.size + eventsToSync.size) {
-                fullAgenda(token)
-            }
+
+            fullAgenda(token)
+
 
 
 
@@ -227,22 +252,74 @@ class TaskyRepositoryImpl @Inject constructor(
             null
         }
         remoteItems?.let {
+
             val events: List<EventEntity> = remoteItems.events.map { it.toEventEntity() }
             val tasks: List<TaskEntity> = remoteItems.tasks.map { it.toTaskEntity() }
             val reminders: List<ReminderEntity> = remoteItems.reminders.map { it.toReminderEntity() }
+            val scheduler = NotificationAlarmScheduler(context)
+            val deletedIds = dao.getDeletes().map { it.id }
             events.let { eventEntities ->
                 for (eventEntity in eventEntities) {
-                    dao.insertEvent(eventEntity)
+                    val notification = getNotificationById(eventEntity.id)
+                    if (notification == null) {
+                        val notificationNew = NotificationEntity(id = eventEntity.id, name = eventEntity.title,
+                            description = eventEntity.description ?: "", itemType = 0, remindAt = eventEntity.remindAt)
+                        notificationNew.let(scheduler::schedule)
+
+                    }
+                    val event = dao.getEventById(eventEntity.id)
+                    if (event == null || !event.needsSync) {
+                        if (eventEntity.id !in deletedIds) {
+                            dao.insertEvent(eventEntity)
+                        }
+
+                    }
                 }
             }
             tasks.let { taskEntities ->
                 for (taskEntity in taskEntities) {
-                    dao.insertTask(taskEntity)
+                    val notification = getNotificationById(taskEntity.id)
+                    if (notification == null) {
+                        val notificationNew = NotificationEntity(
+                            id = taskEntity.id,
+                            name = taskEntity.title,
+                            description = taskEntity.description ?: "",
+                            itemType = 2,
+                            remindAt = taskEntity.remindAt
+                        )
+                        notificationNew.let(scheduler::schedule)
+
+                    }
+                    val task = dao.getTaskById(taskEntity.id)
+                    if (task == null || !task.needsSync) {
+                        if (taskEntity.id !in deletedIds) {
+                            dao.insertTask(taskEntity)
+                        }
+
+                    }
                 }
             }
             reminders.let { reminderEntities ->
                 for (reminderEntity in reminderEntities) {
-                    dao.insertReminder(reminderEntity)
+                    val notification = getNotificationById(reminderEntity.id)
+                    if (notification == null) {
+                        val notificationNew = NotificationEntity(
+                            id = reminderEntity.id,
+                            name = reminderEntity.title,
+                            description = reminderEntity.description ?: "",
+                            itemType = 1,
+                            remindAt = reminderEntity.remindAt
+                        )
+                        notificationNew.let(scheduler::schedule)
+
+                    }
+                    val reminder = dao.getReminderById(reminderEntity.id)
+                    if (reminder == null || !reminder.needsSync) {
+                        if (reminderEntity.id !in deletedIds) {
+                            dao.insertReminder(reminderEntity)
+                        }
+
+                    }
                 }
             }
 
@@ -438,60 +515,115 @@ class TaskyRepositoryImpl @Inject constructor(
     override suspend fun createEvent(
         token: String,
         eventRequest: EventDto,
-        photos: List<MultipartBody.Part>,
-        host: String
+        photos: List<File>,
+        hostId: String
     ){
         try {
-            val event = taskyApi.createEvent(token = token, eventRequest = eventRequest, photos = photos).body()?.toEventEntity()
-            if (event != null) {
-                dao.insertEvent(event)
+            val photoParts: List<MultipartBody.Part> = photos.mapIndexed { index, file ->
+                createPartFromFile(file, "photo$index")
+            }
+            Log.d("sss", "This is $photoParts")
+            Log.d("sss", "This is $photos")
+            val event = taskyApi.createEvent(token = token, eventRequest = eventRequest, photos = photoParts)
+            if (event.isSuccessful) {
+                Log.d("this", "this is photos ${event.body()!!.photos}")
+
+                dao.insertEvent(event.body()!!.toEventEntity())
             }
             else {
-                dao.insertEvent(eventRequest.toEventEntity(host))
+                Log.d("this", "this is photos ")
+                dao.insertEvent(eventRequest.toEventEntity(hostId))
             }
         }catch (e: IOException) {
-            dao.insertEvent(eventRequest.toEventEntity(host))
+            dao.insertEvent(eventRequest.toEventEntity(hostId))
 
         }
         catch (e: HttpException) {
-            dao.insertEvent(eventRequest.toEventEntity(host))
+            dao.insertEvent(eventRequest.toEventEntity(hostId))
         }
 
 
+    }
+
+    override suspend fun insertDeletes(deleteEntity: DeleteEntity) {
+        dao.insertDeletes(deleteEntity)
     }
 
     override suspend fun updateEvent(
         token: String,
         eventRequest: EventUpdateDto,
-        photos: List<MultipartBody.Part>,
+        photos: List<File>,
         userId: String
     ){
         try {
-            val event = taskyApi.updateEvent(token = token, eventRequest = eventRequest, photos = photos).body()?.toEventEntity()
+            val photoParts: List<MultipartBody.Part> = photos.mapIndexed { index, file ->
+                createPartFromFile(file, "photo$index")
+            }
+            val event = taskyApi.updateEvent(token = token, eventRequest = eventRequest, photos = photoParts).body()?.toEventEntity()
             if (event != null) {
                 dao.insertEvent(event)
             }
             else {
-                eventRequest.toEventEntity(dao, userId)?.let { dao.insertEvent(it) }
+                val startTime =  convertUtcTimestampToLocalDateTime(eventRequest.from, getDeviceTimeZone().id)
+                val endTime =  convertUtcTimestampToLocalDateTime(eventRequest.to, getDeviceTimeZone().id)
+                val remindAt = convertUtcTimestampToLocalDateTime(eventRequest.to, getDeviceTimeZone().id)
+
+                dao.insertEvent(dao.getEventById(eventRequest.id)!!.copy(title = eventRequest.title, isGoing = eventRequest.isGoing, needsSync = true, kindOfSync = "UPDATE", description = eventRequest.description, startTime = startTime, to = endTime, remindAt = remindAt))
+
             }
         } catch (e: IOException) {
-            eventRequest.toEventEntity(dao, userId)?.let { dao.insertEvent(it) }
+            val startTime =  convertUtcTimestampToLocalDateTime(eventRequest.from, getDeviceTimeZone().id)
+            val endTime =  convertUtcTimestampToLocalDateTime(eventRequest.to, getDeviceTimeZone().id)
+            val remindAt = convertUtcTimestampToLocalDateTime(eventRequest.to, getDeviceTimeZone().id)
+
+            dao.insertEvent(dao.getEventById(eventRequest.id)!!.copy(title = eventRequest.title, isGoing = eventRequest.isGoing,  needsSync = true, kindOfSync = "UPDATE",description = eventRequest.description, startTime = startTime, to = endTime, remindAt = remindAt))
+
 
 
         }
         catch (e: HttpException) {
-            eventRequest.toEventEntity(dao, userId)?.let { dao.insertEvent(it) }
+            val startTime =  convertUtcTimestampToLocalDateTime(eventRequest.from, getDeviceTimeZone().id)
+            val endTime =  convertUtcTimestampToLocalDateTime(eventRequest.to, getDeviceTimeZone().id)
+            val remindAt = convertUtcTimestampToLocalDateTime(eventRequest.to, getDeviceTimeZone().id)
+
+            dao.insertEvent(dao.getEventById(eventRequest.id)!!.copy(title = eventRequest.title, description = eventRequest.description, startTime = startTime, to = endTime, remindAt = remindAt))
+
 
         }
 
     }
 
+    override suspend fun insertNotification(notificationEntity: NotificationEntity) {
+        dao.insertNotification(notificationEntity)
+    }
+
+    override suspend fun getNotificationById(notificationId: String): NotificationEntity? {
+        return dao.getNotificationById(notificationId)
+    }
+
 
     override suspend fun getAttendee(token: String, email: String): AttendeeIsGoing? {
-        val response = taskyApi.getAttendee(token = token, email = email)
-        return if (response.isSuccessful) {
-            response.body()?.toAttendeeIsGoing()
-        } else null
+        try {
+            Log.d("response", "this is token $token")
+            val response = taskyApi.getAttendee(token = token, email = email)
+            Log.d("response", "this is response $response")
+            return if (response.isSuccessful) {
+                response.body()?.toAttendeeIsGoing()
+            } else null
+
+        }
+        catch (e: HttpException) {
+            Log.d("Response", "ERRORHTTP")
+            return null
+        }
+        catch (e: IOException) {
+            Log.d("Response", "IO ERROR")
+            return null
+        }
+
+
+
+
     }
 
     override suspend fun deleteAttendee(token: String, eventId: String) {
@@ -514,8 +646,19 @@ class TaskyRepositoryImpl @Inject constructor(
 
     override suspend fun createTask(token: String, task: TaskEntity) {
         try {
-            taskyApi.createTask(token = token,task = task.toTaskDto())
-            dao.insertTask(task)
+
+            val mask = task.toTaskDto()
+            val dayWithTime = convertUtcTimestampToLocalDateTime(mask.time, getDeviceTimeZone().id).toLocalDate()
+            Log.d("TEST", "this is day time $dayWithTime")
+            Log.d("TEST","and this is direct ${task.time}")
+            val response = taskyApi.createTask(token = token,task = task.toTaskDto())
+            Log.d("wtf", "THIS IS RESPONSE $response")
+            if (response.isSuccessful) {
+                dao.insertTask(task)
+            }else {
+                dao.insertTask(task.copy(needsSync = true, kindOfSync = "POST"))
+            }
+
 
         }
         catch (e: HttpException) {
@@ -554,11 +697,20 @@ class TaskyRepositoryImpl @Inject constructor(
         }
 
     }
+    fun convertLongToDateTime(timestamp: Long): LocalDateTime {
+        val instant = Instant.ofEpochMilli(timestamp)
+        return LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+    }
 
 
     private fun convertUtcTimestampToLocalDateTime(utcTimestamp: Long, timeZone: String): LocalDateTime {
         val instant = Instant.ofEpochMilli(utcTimestamp)
         val zoneId = ZoneId.of(timeZone)
         return instant.atZone(ZoneId.of("UTC")).withZoneSameInstant(zoneId).toLocalDateTime()
+    }
+
+    private fun createPartFromFile(file: File, paramName: String): MultipartBody.Part {
+        val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+        return MultipartBody.Part.createFormData(paramName, file.name, requestFile)
     }
 }

@@ -10,7 +10,7 @@ import java.time.LocalDateTime
 data class TaskEntity(
     @PrimaryKey val id: String,
     val title: String,
-    val description: String? = null,
+    val description: String? = "",
     @TypeConverters(LocalDateTimeConverter::class)
     val time: LocalDateTime,
     @TypeConverters(LocalDateTimeConverter::class)

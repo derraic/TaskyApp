@@ -48,48 +48,48 @@ interface TaskyApi {
         @Body deletedItems: SyncAgendaDto
     ): Response<ResponseBody>
 
-    @GET
+    @GET("/fullAgenda")
     suspend fun fullAgenda(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
     ): Response<AgendaDto>
 
-    @DELETE
+    @DELETE("/event")
     suspend fun deleteEventItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("eventId") eventId: String
     ): Response<ResponseBody>
 
-    @DELETE
+    @DELETE("/task")
     suspend fun deleteTaskItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("taskId") taskId: String
     ): Response<ResponseBody>
 
-    @DELETE
+    @DELETE("/reminder")
     suspend fun deleteReminderItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("reminderId") reminderId: String
     ): Response<ResponseBody>
 
-    @GET
+    @GET("/task")
     suspend fun getTaskItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("taskId") taskId: String
     ): Response<TaskDto>
 
-    @GET
+    @GET("/reminder")
     suspend fun getReminderItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
         @Query("reminderId") reminderId: String
     ): Response<ReminderDto>
 
-    @GET
+    @GET("/event")
     suspend fun getEventItem(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,
@@ -106,7 +106,7 @@ interface TaskyApi {
     ): Response<EventResponseDto>
 
     @Multipart
-    @POST("/event")
+    @PUT("/event")
     suspend fun updateEvent(
         @Header("x-api-key") apiKey: Int = API_KEY,
         @Header("Authorization") token: String,

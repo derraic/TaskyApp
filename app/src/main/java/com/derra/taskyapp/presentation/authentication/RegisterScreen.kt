@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.derra.taskyapp.R
 import com.derra.taskyapp.util.UiEvent
@@ -35,7 +36,10 @@ fun RegisterScreen(
     modifier: Modifier = Modifier,
     viewModel: AuthenticationViewModel = hiltViewModel(),
     onPopBackStack: () -> Unit,
+    window: android.view.Window
 ) {
+
+    WindowCompat.setDecorFitsSystemWindows(window, true)
 
 
     LaunchedEffect(key1 = true) {

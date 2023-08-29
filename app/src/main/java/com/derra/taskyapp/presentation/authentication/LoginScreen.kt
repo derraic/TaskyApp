@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.derra.taskyapp.R
 import com.derra.taskyapp.util.UiEvent
@@ -33,8 +34,10 @@ import com.derra.taskyapp.util.UiEvent
 fun LoginScreen(
     modifier: Modifier = Modifier,
     viewModel: AuthenticationViewModel = hiltViewModel(),
-    onNavigate: (UiEvent.Navigate) -> Unit
+    onNavigate: (UiEvent.Navigate) -> Unit,
+    window: android.view.Window
 ) {
+    WindowCompat.setDecorFitsSystemWindows(window, true)
 
 
     LaunchedEffect(key1 = true) {

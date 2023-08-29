@@ -3,6 +3,7 @@ package com.derra.taskyapp.presentation.reminder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.derra.taskyapp.presentation.task.TaskEditableScreen
 import com.derra.taskyapp.presentation.task.TaskNonEditableScreen
@@ -12,8 +13,12 @@ import com.derra.taskyapp.util.UiEvent
 fun ReminderScreen(
     viewModel: ReminderViewModel = hiltViewModel(),
     onPopBackStack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    window: android.view.Window
 ) {
+
+    WindowCompat.setDecorFitsSystemWindows(window, true)
+
     val editMode = viewModel.editMode
 
     LaunchedEffect(key1 = true) {
@@ -30,7 +35,7 @@ fun ReminderScreen(
 
     }
     else {
-        ReminderEditableScreen(viewModel)
+        ReminderNonEditableScreen(viewModel)
 
     }
 

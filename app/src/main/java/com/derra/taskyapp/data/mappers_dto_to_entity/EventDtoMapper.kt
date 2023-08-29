@@ -4,6 +4,7 @@ import com.derra.taskyapp.data.mappers.toEvent
 import com.derra.taskyapp.data.mappers.toEventEntity
 import com.derra.taskyapp.data.objectsviewmodel.Attendee
 import com.derra.taskyapp.data.objectsviewmodel.Photo
+import com.derra.taskyapp.data.remote.dto.AttendeeDtoResponse
 import com.derra.taskyapp.data.remote.dto.EventDto
 import com.derra.taskyapp.data.remote.dto.EventResponseDto
 import com.derra.taskyapp.data.remote.dto.EventUpdateDto
@@ -25,7 +26,7 @@ fun EventResponseDto.toEventEntity(): EventEntity {
     return EventEntity(
         id = id,
         title = title,
-        description = description,
+        description = description ?: "",
         startTime = from.toLocalDateTimeInDeviceTimeZone(),
         to = to.toLocalDateTimeInDeviceTimeZone(),
         remindAt = remindAt.toLocalDateTimeInDeviceTimeZone(),
@@ -38,18 +39,19 @@ fun EventResponseDto.toEventEntity(): EventEntity {
     )
 }
 
-fun EventEntity.toEventUpdateDto(dao: TaskyDao, userId: String): EventUpdateDto{
-    var isGoing: Boolean = false
+fun EventEntity.toEventUpdateDto(dao: TaskyDao): EventUpdateDto{
+    /*var isGoing: Boolean = false
     val event = this.toEvent()
     for (i in event.attendees) {
         if ( i.userId == userId) {
             isGoing = i.isGoing
         }
     }
+    */
     return EventUpdateDto(
         id = id,
         title = title,
-        description = description,
+        description = description ?: "",
         from = startTime.toTimestampInDeviceTimeZone(),
         to = to.toTimestampInDeviceTimeZone(),
         remindAt = remindAt.toTimestampInDeviceTimeZone(),
@@ -106,7 +108,7 @@ fun EventEntity.toEventDto(): EventDto {
     return EventDto(
         id = id,
         title = title,
-        description = description,
+        description = description ?: "",
         from = startTime.toTimestampInDeviceTimeZone(),
         to = to.toTimestampInDeviceTimeZone(),
         remindAt = remindAt.toTimestampInDeviceTimeZone(),
@@ -129,8 +131,8 @@ fun EventEntity.toEventResponseDto(): EventResponseDto {
 }
 
 // Helper function to convert JSON string to List<Attendee>
-private fun parseAttendeesJson(json: String): List<Attendee> {
-    val listType: Type = object : TypeToken<List<Attendee>>() {}.type
+private fun parseAttendeesJson(json: String): List<AttendeeDtoResponse> {
+    val listType: Type = object : TypeToken<List<AttendeeDtoResponse>>() {}.type
     return gson.fromJson(json, listType)
 }
 

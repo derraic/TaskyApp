@@ -93,50 +93,52 @@ fun ReminderNonEditableScreen(
 
             }
             Spacer(modifier = Modifier.height(30.5.dp))
-            Row(modifier = Modifier.padding(start = 16.dp)) {
+            Row(modifier = Modifier.padding(start = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
 
-                Image(painter = painterResource(id = R.drawable.checkbox_agendaitems_selected), contentDescription = "checked")
+                Image(painter = painterResource(id = R.drawable.circle_checked_task), contentDescription = "checked")
 
                 Spacer(modifier = Modifier.width(9.dp))
                 Text(
-                    text = viewModel.title,
+                    text = if (viewModel.title.isBlank()) "Title" else viewModel.title,
                     style = TextStyle(
                         fontSize = 26.sp,
                         lineHeight = 25.sp,
                         fontFamily = FontFamily(Font(R.font.inter_regular)),
-                        fontWeight = FontWeight(700),
-                        color = Color(0xFF16161C),
+                        fontWeight = if (viewModel.title.isBlank()) FontWeight(700) else FontWeight(500),
+                        color = if (viewModel.title.isBlank()) Color(0xFFA9B4BE) else Color(
+                            0xFF16161C
+                        ),
                     )
                 )
 
             }
             Spacer(modifier = Modifier.height(22.dp))
-            Modifier
+            Spacer(modifier =  Modifier
                 .padding(horizontal = 17.dp)
-                .width(326.dp)
+                .fillMaxWidth()
                 .height(1.dp)
-                .background(color = Color(0xFFEEF6FF))
+                .background(color = Color(0xFFEEF6FF)))
 
-            Row(modifier = Modifier.height(85.dp).padding(start = 17.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(start = 17.dp, top = 17.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = viewModel.description,
+                    text = if (viewModel.description.isBlank()) "Description" else viewModel.description,
                     style = TextStyle(
                         fontSize = 16.sp,
                         lineHeight = 15.sp,
                         fontFamily = FontFamily(Font(R.font.inter_regular)),
                         fontWeight = FontWeight(400),
-                        color = Color(0xFF16161C),
+                        color = if (viewModel.description.isBlank()) Color(0xFFA9B4BE) else Color(0xFF16161C),
                     )
                 )
             }
 
 
-            val time = viewModel.dateTime.toLocalTime()?.format(DateTimeFormatter.ofPattern("HH::mm"))
-                ?: LocalTime.now().format(DateTimeFormatter.ofPattern("HH::mm"))
+            val time = viewModel.dateTime.toLocalTime()?.format(DateTimeFormatter.ofPattern("HH:mm"))
+                ?: LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
             Row(modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 17.dp)
-                .height(70.00003.dp)
+                .height(70.dp)
                 .padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "At",
@@ -178,33 +180,40 @@ fun ReminderNonEditableScreen(
                 Spacer(
                     modifier = Modifier
                         .padding(horizontal = 17.dp)
-                        .width(326.dp)
+                        .fillMaxWidth()
                         .height(1.dp)
                         .background(color = Color(0xFFEEF6FF))
                 )
 
                 Row(modifier = Modifier
-                    .height(70.00003.dp)
+                    .height(70.dp)
                     .fillMaxWidth()
-                    .padding(horizontal = 17.dp),
+                    .padding(start = 17.dp, end = 30.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start,) {
-                    Image(painter = painterResource(id = R.drawable.bell_icon_in_box), contentDescription = "notification")
-                    Spacer(modifier = Modifier.width(13.dp))
+                    horizontalArrangement = Arrangement.SpaceBetween,) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(painter = painterResource(id = R.drawable.bell_icon_in_box), contentDescription = "notification")
+                        Spacer(modifier = Modifier.width(13.dp))
 
-                    Text(
-                        modifier = Modifier.width(139.dp),
-                        text = viewModel.giveReminderString(viewModel.minutesBefore),
-                        style = TextStyle(
-                            fontSize = 16.sp,
-                            lineHeight = 15.sp,
-                            fontFamily = FontFamily(Font(R.font.inter_regular)),
-                            fontWeight = FontWeight(400),
-                            color = Color(0xFF16161C),
+
+                        Text(
+                            modifier = Modifier.width(139.dp),
+                            text = viewModel.giveReminderString(viewModel.minutesBefore),
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                lineHeight = 15.sp,
+                                fontFamily = FontFamily(Font(R.font.inter_regular)),
+                                fontWeight = FontWeight(400),
+                                color = Color(0xFF16161C),
+                            )
                         )
-                    )
-                    Spacer(modifier = Modifier.width(127.dp))
-                    Image(painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit?")
+                    }
+
+                    Box(modifier = Modifier.width(30.dp).height(30.dp), contentAlignment = Alignment.Center) {
+                        Image(
+                            painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right)
+                            , contentDescription = "edit?")
+                    }
 
 
                     }
@@ -222,7 +231,7 @@ fun ReminderNonEditableScreen(
                 Spacer(modifier = Modifier.height(15.dp))
                 Row(Modifier.fillMaxWidth().clickable {  }, horizontalArrangement = Arrangement.Center) {
                     Text(
-                        text = "Delete Reminder",
+                        text = "DELETE REMINDER",
                         style = TextStyle(
                             fontSize = 16.sp,
                             lineHeight = 30.sp,

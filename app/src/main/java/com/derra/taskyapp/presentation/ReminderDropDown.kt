@@ -11,7 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.modifier.modifierLocalMapOf
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+
+
 
 @Composable
 fun ReminderDropDown(
@@ -20,18 +24,13 @@ fun ReminderDropDown(
 ) {
     Column(
         modifier = Modifier
-            .shadow(
-                elevation = 4.dp,
-                spotColor = Color(0x1A000000),
-                ambientColor = Color(0x1A000000)
-            )
             .width(224.dp)
             .height(235.dp)
             .background(color = Color(0xFFFFFFFF), shape = RoundedCornerShape(size = 7.dp))
     ) {
         Row(
             Modifier
-                .fillMaxWidth()
+                .width(224.dp)
                 .clickable { onItemClick(10) }
                 .height(47.dp)
                 .padding(start = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -39,7 +38,7 @@ fun ReminderDropDown(
         }
         Row(
             Modifier
-                .fillMaxWidth()
+                .width(22.dp)
                 .clickable { onItemClick(30) }
                 .height(47.dp)
                 .padding(start = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -47,7 +46,7 @@ fun ReminderDropDown(
         }
         Row(
             Modifier
-                .fillMaxWidth()
+                .width(224.dp)
                 .clickable { onItemClick(60) }
                 .height(47.dp)
                 .padding(start = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -55,7 +54,7 @@ fun ReminderDropDown(
         }
         Row(
             Modifier
-                .fillMaxWidth()
+                .width(224.dp)
                 .clickable { onItemClick(360) }
                 .height(47.dp)
                 .padding(start = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -63,7 +62,7 @@ fun ReminderDropDown(
         }
         Row(
             Modifier
-                .fillMaxWidth()
+                .width(224.dp)
                 .clickable { onItemClick(1440) }
                 .height(47.dp)
                 .padding(start = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -73,3 +72,4 @@ fun ReminderDropDown(
     }
 
 }
+

@@ -46,7 +46,7 @@ fun DeleteItemDialog(
 
     if (showDialog) {
         AlertDialog(
-            onDismissRequest = { onCancelClick},
+            onDismissRequest = { onCancelClick()},
             text = {
                 Column(modifier = Modifier
                     .fillMaxSize()
@@ -111,7 +111,7 @@ fun DeleteItemDialog(
                             )
                             .width(151.dp)
                             .height(48.dp)
-                            .clickable { onCancelClick }
+                            .clickable { onCancelClick() }
                             .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 12.dp)
                         ) {
                             Text(
@@ -137,7 +137,7 @@ fun DeleteItemDialog(
                                     shape = RoundedCornerShape(size = 10.dp)
                                 )
                                 .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 12.dp)
-                                .clickable { onOkClick }
+                                .clickable { onOkClick() }
                             //.paint(painter = painterResource(id = R.drawable.button_got_it_good))
                         ) {
                             Text(

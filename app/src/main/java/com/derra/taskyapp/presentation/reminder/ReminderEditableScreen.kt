@@ -29,6 +29,7 @@ import com.derra.taskyapp.presentation.ReminderDropDown
 import com.derra.taskyapp.presentation.agenda.DayTaskEvent
 import com.derra.taskyapp.presentation.agenda.DeleteItemDialog
 import com.derra.taskyapp.presentation.agenda.UndoChangesDialog
+import com.derra.taskyapp.presentation.event.ReminderDropdownReal
 import com.vanpra.composematerialdialogs.MaterialDialog
 import com.vanpra.composematerialdialogs.datetime.time.timepicker
 import com.vanpra.composematerialdialogs.rememberMaterialDialogState
@@ -46,6 +47,7 @@ fun ReminderEditableScreen(
     val initialDateMillis = viewModel.date.toEpochDay() * 24 * 60 * 60 * 1000
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialDateMillis)
     val initialTime = viewModel.time ?: LocalTime.now()
+    val dialogState = rememberMaterialDialogState()
     if (viewModel.editDescriptionMode) {
         EditDescriptionScreen(
             onTextChange = { newDescription -> viewModel.onEvent(ReminderEvent.OnTextChange(newDescription))},
@@ -145,26 +147,35 @@ fun ReminderEditableScreen(
 
                     }
                     Spacer(modifier = Modifier.height(30.5.dp))
-                    Row(modifier = Modifier.padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Row() {
+                    Row(modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 17.dp, end = 17.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
 
-                            Image(painter = painterResource(id = R.drawable.circle_checked_task), contentDescription = "checked")
+                            Image(
+                                painter = painterResource(id = R.drawable.circle_checked_task),
+                                contentDescription = "checked"
+                            )
 
                             Spacer(modifier = Modifier.width(9.dp))
                             Text(
-                                text = viewModel.title,
+                                text = if (viewModel.title.isBlank()) "Title" else viewModel.title,
                                 style = TextStyle(
                                     fontSize = 26.sp,
                                     lineHeight = 25.sp,
                                     fontFamily = FontFamily(Font(R.font.inter_regular)),
-                                    fontWeight = FontWeight(700),
-                                    color = Color(0xFF16161C),
+                                    fontWeight = if (viewModel.title.isBlank()) FontWeight(700) else FontWeight(500),
+                                    color = if (viewModel.title.isBlank()) Color(0xFFA9B4BE) else Color(
+                                        0xFF16161C
+                                    ),
                                 )
                             )
+                        }
 
                             Box(modifier = Modifier
                                 .width(30.dp)
-                                .height(30.35489.dp)
                                 .clickable {
                                     viewModel.onEvent(ReminderEvent.EditTitleClick)
                                 }
@@ -172,35 +183,34 @@ fun ReminderEditableScreen(
                                 Image(painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit")
 
                             }
-                        }
+
 
 
 
                     }
                     Spacer(modifier = Modifier.height(22.dp))
-                    Modifier
+                    Spacer(modifier = Modifier
                         .padding(horizontal = 17.dp)
-                        .width(326.dp)
+                        .fillMaxWidth()
                         .height(1.dp)
-                        .background(color = Color(0xFFEEF6FF))
+                        .background(color = Color(0xFFEEF6FF)))
                     Row(modifier = Modifier
-                        .height(85.dp)
-                        .padding(start = 17.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        .fillMaxWidth()
+                        .padding(start = 17.dp, end = 17.dp, bottom = 20.dp, top = 17.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
 
                         Text(
-                            text = viewModel.description,
+                            text = if (viewModel.description.isBlank()) "Description" else viewModel.description,
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 lineHeight = 15.sp,
                                 fontFamily = FontFamily(Font(R.font.inter_regular)),
                                 fontWeight = FontWeight(400),
-                                color = Color(0xFF16161C),
+                                color = if (viewModel.description.isBlank()) Color(0xFFA9B4BE) else Color(0xFF16161C),
                             )
                         )
 
                         Box(modifier = Modifier
                             .width(30.dp)
-                            .height(30.35489.dp)
                             .clickable {
                                 viewModel.onEvent(ReminderEvent.EditDescriptionClick)
                             }
@@ -213,19 +223,19 @@ fun ReminderEditableScreen(
 
                     }
 
-                    val time = viewModel.dateTime.toLocalTime().format(DateTimeFormatter.ofPattern("HH::mm"))
+                    val time = viewModel.dateTime.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))
                     Spacer(
                         modifier = Modifier
                             .padding(horizontal = 17.dp)
-                            .width(326.dp)
+                            .fillMaxWidth()
                             .height(1.dp)
                             .background(color = Color(0xFFEEF6FF))
                     )
 
                     Row(modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 17.dp)
-                        .height(70.00003.dp)
+                        .padding(start = 17.dp, end = 30.dp)
+                        .height(70.dp)
                         .padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -240,7 +250,8 @@ fun ReminderEditableScreen(
                         )
                         Spacer(modifier = Modifier.width(39.dp))
                         Text(
-                            modifier = Modifier.clickable { viewModel.onEvent(ReminderEvent.EditTimeClick) },
+                            modifier = Modifier.clickable { viewModel.onEvent(ReminderEvent.EditTimeClick)
+                                                          dialogState.show()},
                             text = time,
                             style = TextStyle(
                                 fontSize = 16.sp,
@@ -275,11 +286,11 @@ fun ReminderEditableScreen(
                         )
 
                         Row(modifier = Modifier
-                            .height(70.00003.dp)
+                            .height(70.dp)
                             .fillMaxWidth()
-                            .padding(horizontal = 17.dp),
+                            .padding(start = 17.dp, end = 30.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start,) {
+                            horizontalArrangement = Arrangement.SpaceBetween,) {
                             Image(painter = painterResource(id = R.drawable.bell_icon_in_box), contentDescription = "notification")
                             Spacer(modifier = Modifier.width(13.dp))
 
@@ -295,17 +306,22 @@ fun ReminderEditableScreen(
                                 )
                             )
                             Spacer(modifier = Modifier.width(127.dp))
-                            Box () {
-                                Image(modifier = Modifier.clickable { viewModel.onEvent(ReminderEvent.AdjustNotificationClick) }
-                                    ,painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit?")
-                            }
-                            DropdownMenu(expanded = viewModel.reminderDropDown, onDismissRequest = { viewModel.onEvent(ReminderEvent.ReminderTimeDismiss) }) {
-                                androidx.compose.material.DropdownMenuItem(onClick = {}) {
-                                    ReminderDropDown(onItemClick = {minutesBefore -> viewModel.onEvent(ReminderEvent.DifferentReminderTimeClick(minutesBefore))})
-
+                            Column() {
+                                Box (modifier = Modifier
+                                    .width(30.dp)
+                                    .height(30.dp)
+                                , contentAlignment = Alignment.Center) {
+                                    Image(modifier = Modifier.clickable { viewModel.onEvent(ReminderEvent.AdjustNotificationClick) }
+                                        ,painter = painterResource(id = R.drawable.edit_mode_screen_icon_arrow_to_the_right), contentDescription = "edit?")
                                 }
+                                ReminderDropdownReal(
+                                    expanded = viewModel.reminderDropDown,
+                                    onDissmissRequest = { viewModel.onEvent(ReminderEvent.ReminderTimeDismiss)},
+                                    onItemClick = {minutesBefore -> viewModel.onEvent(ReminderEvent.DifferentReminderTimeClick(minutesBefore))}
+                                )
 
                             }
+
 
 
 
@@ -328,7 +344,7 @@ fun ReminderEditableScreen(
                                 , horizontalArrangement = Arrangement.Center) {
                             Text(
                                 modifier = Modifier.clickable { viewModel.onEvent(ReminderEvent.DeleteReminderClick) },
-                                text = "Delete Task",
+                                text = "DELETE TASK",
                                 style = TextStyle(
                                     fontSize = 16.sp,
                                     lineHeight = 30.sp,
@@ -403,15 +419,17 @@ fun ReminderEditableScreen(
             }
 
 
-            val dialogState = rememberMaterialDialogState()
+
             MaterialDialog(
                 dialogState = dialogState,
                 buttons = {
                     positiveButton("Ok") {
                         viewModel.onEvent(ReminderEvent.OnTimeSave)
+                        dialogState.hide()
                     }
                     negativeButton("Cancel") {
                         viewModel.onEvent(ReminderEvent.OnTimeDismiss)
+                        dialogState.hide()
                     }
                 }
             ) {

@@ -1,12 +1,21 @@
 package com.derra.taskyapp.presentation.agenda
 
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.*
+import com.derra.taskyapp.SyncWorker
+import com.derra.taskyapp.data.NotificationAlarmScheduler
 import com.derra.taskyapp.data.TaskyRepository
 import com.derra.taskyapp.data.mappers.toTaskEntity
+import com.derra.taskyapp.data.mappers_dto_to_entity.getDeviceTimeZone
 import com.derra.taskyapp.data.objectsviewmodel.Event
 import com.derra.taskyapp.data.objectsviewmodel.Reminder
 import com.derra.taskyapp.data.objectsviewmodel.Task
@@ -17,26 +26,30 @@ import com.derra.taskyapp.util.UiEvent
 import com.derra.taskyapp.util.UserManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.*
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltViewModel
 class DayTasksViewModel @Inject constructor(
     private val repository: TaskyRepository,
+    private val context: Context,
     private val userManager: UserManager
 ): ViewModel(){
 
 
     private var userInfo: LoginResponseDto? = null
     var name by mutableStateOf("")
-    var daySelected by mutableStateOf<LocalDate?>(null)
+    var daySelected by mutableStateOf<LocalDate>(LocalDate.now())
     var token: String = ""
     var isLoading by mutableStateOf(false)
     var events by mutableStateOf<List<Event>>(emptyList())
@@ -56,17 +69,42 @@ class DayTasksViewModel @Inject constructor(
     val uiEvent = _uiEvent.receiveAsFlow()
 
 
+    var permissionNotification by mutableStateOf(false)
     
 
     var mergedList by mutableStateOf<List<Any>>(reminders + tasks + events)
+        private set
     init {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionNotification = ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else{
+            permissionNotification = true
+        }
 
         userInfo = getLoginResponse()
         token = userInfo?.token ?: ""
+        token = "Bearer $token"
         name = userInfo?.fullName ?: ""
         name = getNameInitials(name)
         daySelected = LocalDate.now()
-        getDayThings(LocalDate.now().toEpochDay())
+        getDayThings(LocalDateTime.now())
+
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED) // Require unmetered network (Wi-Fi)
+            .build()
+
+        val inputData = Data.Builder()
+            .putString(SyncWorker.TOKEN_KEY, token)
+            .build()
+
+        val syncWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .setInputData(inputData)
+            .build()
+
+        WorkManager.getInstance(context).enqueue(syncWorkRequest)
+
 
 
 
@@ -105,23 +143,27 @@ class DayTasksViewModel @Inject constructor(
         return localDateTime.format(formatter)
     }
 
+    private val scheduler = NotificationAlarmScheduler(context)
     fun onEvent(event: DayTaskEvent){
         when (event) {
             is DayTaskEvent.AddEventClick -> {
                 addItemDropDownDialog = false
+                val value = true
 
-                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_EVENT_SCREEN))
+                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_EVENT_SCREEN + "?eventId=NONE" + "&isEditable=true"))
                 // navigate to event in edit mode
 
             }
             is DayTaskEvent.AddReminderClick -> {
                 addItemDropDownDialog = false
-                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_REMINDER_SCREEN))
+                val value = true
+                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_REMINDER_SCREEN + "?reminderId=NONE" + "&isEditable=true"))
                 // navigate to reminder in edit mode
             }
             is DayTaskEvent.AddTaskClick -> {
                 addItemDropDownDialog = false
-                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_TASK_SCREEN))
+                val value = true
+                sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_TASK_SCREEN + "?taskId=NONE" + "&isEditable=true"))
                 // navigate to task in edit mode
             }
             is DayTaskEvent.ConfirmDialogOkClick -> {
@@ -129,12 +171,21 @@ class DayTasksViewModel @Inject constructor(
                     is Event -> {
                         if ((currItemSelected as Event).isUserEventCreator) {
                             viewModelScope.launch {
-                                repository.deleteEventItem(token, (currItemSelected as Event).id)
+                                val event1 = currItemSelected as Event
+                                repository.deleteEventItem(token, event1.id)
+                                val notification = repository.getNotificationById(event1.id)
+                                notification?.let(scheduler::cancel)
+
+
+
                             }
                         }
                         else {
                             viewModelScope.launch {
-                                repository.deleteAttendee(token, (currItemSelected as Event).id)
+                                val event1 = currItemSelected as Event
+                                repository.deleteAttendee(token, event1.id)
+                                val notification = repository.getNotificationById(event1.id)
+                                notification?.let(scheduler::cancel)
                             }
                         }
 
@@ -142,25 +193,34 @@ class DayTasksViewModel @Inject constructor(
                     }
                     is Reminder -> {
                         viewModelScope.launch {
-                            repository.deleteReminderItem(token, (currItemSelected as Reminder).id)
+                            val reminder1 = currItemSelected as Reminder
+                            repository.deleteReminderItem(token, reminder1.id)
+                            val notification = repository.getNotificationById(reminder1.id)
+                            notification?.let(scheduler::cancel)
+
                         }
 
                     }
                     is Task -> {
                         viewModelScope.launch {
-                            repository.deleteTaskItem(token, (currItemSelected as Task).id)
+                            val task1 = currItemSelected as Task
+                            repository.deleteTaskItem(token, task1.id)
+                            val notification = repository.getNotificationById(task1.id)
+                            notification?.let(scheduler::cancel)
                         }
 
                     }
 
                     // ask chatgpt if it works when an item gets deleted
                 }
-                getDayThings(daySelected!!.toEpochDay())
+                deleteDialog = false
+                getDayThings(LocalDateTime.of(daySelected, LocalTime.now()))
                 
             }
             is DayTaskEvent.AnotherDayClick -> {
                 daySelected = event.dayClicked
-                getDayThings(daySelected!!.toEpochDay())
+                getDayThings(LocalDateTime.of(daySelected, LocalTime.now()))
+                sendUiEvent(UiEvent.ShowToast(""))
             }
             is DayTaskEvent.AddItemClick -> {
                 addItemDropDownDialog = true
@@ -198,9 +258,9 @@ class DayTasksViewModel @Inject constructor(
             }
             is DayTaskEvent.TaskItemCheckBoxClick -> {
                 viewModelScope.launch {
-                    repository.updateTask(token, task = event.task.toTaskEntity().copy(isDone = event.checked))
+                    repository.updateTask(token, task = event.task.toTaskEntity().copy(isDone = !event.task.isDone))
                 }
-               getDayThings(daySelected!!.toEpochDay())
+                getDayThings(LocalDateTime.of(daySelected, LocalTime.now()))
 
             }
             is DayTaskEvent.UserProfileClick -> {
@@ -211,17 +271,17 @@ class DayTasksViewModel @Inject constructor(
                 when (currItemSelected) {
                     is Event -> {
                         sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_EVENT_SCREEN +
-                                "?eventId=${(currItemSelected as Event).id}" + "?isEditable={true}")  )
+                                "?eventId=${(currItemSelected as Event).id}" + "&isEditable=true")  )
 
                     }
                     is Task -> {
                         sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_TASK_SCREEN +
-                                "?taskId=${(currItemSelected as Task).id}" + "?isEditable={true}")  )
+                                "?taskId=${(currItemSelected as Task).id}" + "&isEditable=true")  )
 
                     }
                     is Reminder -> {
                         sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_REMINDER_SCREEN +
-                                "?taskId=${(currItemSelected as Reminder).id}" + "?isEditable={true}")  )
+                                "?reminderId=${(currItemSelected as Reminder).id}" + "&isEditable=true")  )
                     }
                 }
             }
@@ -229,17 +289,17 @@ class DayTasksViewModel @Inject constructor(
                 when (currItemSelected) {
                     is Event -> {
                         sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_EVENT_SCREEN +
-                                "?eventId=${(currItemSelected as Event).id}" + "?isEditable={false}")  )
+                                "?eventId=${(currItemSelected as Event).id}" + "&isEditable=false")  )
 
                     }
                     is Task -> {
                         sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_TASK_SCREEN +
-                                "?taskId=${(currItemSelected as Task).id}" + "?isEditable={false}")  )
+                                "?taskId=${(currItemSelected as Task).id}" + "&isEditable=false")  )
 
                     }
                     is Reminder -> {
                         sendUiEvent(UiEvent.Navigate(Routes.EDIT_DETAIL_REMINDER_SCREEN +
-                                "?taskId=${(currItemSelected as Reminder).id}" + "?isEditable={false}")  )
+                                "?taskId=${(currItemSelected as Reminder).id}" + "&isEditable=false")  )
                         // ask chatgpt about the smart cast
                     }
                 }
@@ -249,6 +309,7 @@ class DayTasksViewModel @Inject constructor(
             }
             is DayTaskEvent.DifferentDaySelected -> {
                 daySelected = event.localDate
+                getDayThings(LocalDateTime.of(daySelected, LocalTime.now()))
             }
             is DayTaskEvent.AddItemDialogDismiss -> {
                 addItemDropDownDialog = false
@@ -267,23 +328,32 @@ class DayTasksViewModel @Inject constructor(
 
     }
 
+    fun convertLocalDateTimeToLong(localDateTime: LocalDateTime): Long {
+        val zoneId = getDeviceTimeZone()
+        val zonedDateTime = localDateTime.atZone(zoneId)
+        return zonedDateTime.toInstant().toEpochMilli()
+    }
 
-    private fun getDayThings(time: Long) {
+
+    fun getDayThings(time: LocalDateTime) {
         viewModelScope.launch {
-            repository.getAgenda(token = token, timeZone = TimeZone.getDefault().id, time = time).collectLatest {resource ->
+            repository.getAgenda(token = token, timeZone = TimeZone.getDefault().id, time = convertLocalDateTimeToLong(time)).collect {resource ->
                 when (resource) {
                     is Resource.Loading -> {
                         isLoading = true
                         // Handle loading state
+                        delay(300)
                     }
                     is Resource.Success -> {
                         val agendaItems = resource.data
                         if (agendaItems != null) {
+                            Log.d("HERE", "IT is supposed to work")
                             events = agendaItems.events
                             tasks = agendaItems.tasks
                             reminders = agendaItems.reminders
                             mergedList = (reminders + tasks + events)
 
+                            Log.d("HERE", "this is ${mergedList.size}")
                             sortedList = mergedList.sortedBy { item ->
                                 when (item) {
                                     is Reminder -> item.time // Assuming the time variable is a comparable type (e.g., Long, LocalDateTime, etc.) in Reminder class

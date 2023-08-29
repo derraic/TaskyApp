@@ -10,7 +10,7 @@ import java.time.LocalDateTime
 data class EventEntity(
     @PrimaryKey val id: String,
     val title: String,
-    val description: String,
+    val description: String? = "",
     @TypeConverters(LocalDateTimeConverter::class)
     val startTime: LocalDateTime,
     @TypeConverters(LocalDateTimeConverter::class)
@@ -22,6 +22,7 @@ data class EventEntity(
     val attendeesJson: String,
     val photosJson: String,
     var needsSync: Boolean = true,
-    val kindOfSync: String = "none"
+    val kindOfSync: String = "none",
+    var isGoing: Boolean = true
 
 )
